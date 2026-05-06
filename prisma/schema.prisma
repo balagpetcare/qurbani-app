@@ -1,0 +1,467 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  DOCTOR
+  STAFF
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  ACCEPTED
+  IN_PROGRESS
+  OBSERVED
+  COMPLETED
+  FOLLOW_UP_NEEDED
+  CANCELLED
+  REFERRED
+}
+
+enum DoctorApplicationStatus {
+  NEW
+  REVIEWED
+  APPROVED
+  REJECTED
+  CONVERTED_TO_DOCTOR
+}
+
+enum NotificationChannel {
+  IN_APP
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum NotificationType {
+  NEW_LEAD
+  DOCTOR_ASSIGNED
+  STATUS_CHANGED
+  FOLLOW_UP
+  DOCTOR_APPLICATION
+  EMERGENCY_LEAD
+  CASE_ACCEPTED_BY_DOCTOR
+  DOCTOR_APPLICATION_REVIEWED
+}
+
+enum LeadPriority {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+enum AnimalKind {
+  CATTLE
+  GOAT
+  SHEEP
+  BUFFALO
+  OTHER
+}
+
+enum LeadContactPreference {
+  CALL
+  WHATSAPP
+  VISIT
+}
+
+enum DoctorAreaPreferenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// How the customer paid (or owes); affects settlement rules.
+enum PaymentMethod {
+  CASH
+  BKASH
+  NAGAD
+  BANK
+  ONLINE
+  MIXED
+  DUE
+}
+
+/// Admin reconciliation of platform commission / payouts for a completed case bill.
+enum SettlementStatus {
+  UNSETTLED
+  PENDING_REVIEW
+  APPROVED
+  PAID_TO_PLATFORM
+  PAID_TO_DOCTOR
+  DISPUTED
+  CANCELLED
+}
+
+/// Snapshot of treatment closure semantics on the billing row (invoice/admin use).
+enum TreatmentCompletionStatus {
+  COMPLETED
+  FOLLOW_UP_NEEDED
+  REFERRED
+  CANCELLED
+}
+
+/// Global configurable site settings (admin-managed).
+model SiteSetting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  /// JSON primitive or object — use helpers in `src/lib/site-settings.ts`.
+  value       Json
+  group       String
+  label       String
+  description String?
+  /// When true, key may be exposed via safe server-only public loaders (whitelist still applies).
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([group])
+}
+
+/// Doctor asks admin to change assigned areas; admin applies via existing doctor area APIs.
+model DoctorAreaPreferenceRequest {
+  id               Int                         @id @default(autoincrement())
+  userId           Int
+  user             User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestedAreaIds Json
+  status           DoctorAreaPreferenceStatus @default(PENDING)
+  adminNote        String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@index([userId, status])
+}
+
+/// Service areas (seeded; avoid hardcoding only in frontend).
+model Area {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  name      String
+  nameBn    String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctors       DoctorArea[]
+  leads         Lead[]
+  applications  DoctorApplicationArea[]
+}
+
+/// Doctors (User role DOCTOR) can cover multiple areas.
+model DoctorArea {
+  userId Int
+  areaId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area   Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, areaId])
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  name               String
+  phone              String?   @unique
+  email              String?   @unique
+  passwordHash       String?
+  role               UserRole  @default(STAFF)
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  whatsapp           String?
+  /// @deprecated Prefer DoctorArea; kept for legacy display during transition.
+  areaCoverage       String?
+  emergencyAvailable Boolean   @default(false)
+  notes              String?
+  /// Public landing experience line; falls back if `experienceSummary` empty.
+  experienceSummary  String?   @db.Text
+  qualification      String?
+  shortBio           String?   @db.Text
+  availableTimeText  String?   @db.Text
+  /// Short code: AVAILABLE | LIMITED | OFF
+  availabilityStatus String?
+  profilePhotoUrl    String?
+  /// Public home-visit fee range (BDT, whole taka). Shown on landing; never exposes contact fields.
+  homeVisitFeeMin    Int?
+  homeVisitFeeMax    Int?
+  feeNote            String?   @db.Text
+  notifyEmail        Boolean   @default(false)
+  notifySms          Boolean   @default(false)
+  notifyWhatsApp     Boolean   @default(false)
+  assignedLeads      Lead[]    @relation("AssignedDoctor")
+
+  doctorAreas                   DoctorArea[]
+  doctorAreaPreferenceRequests  DoctorAreaPreferenceRequest[]
+  leadObservations              LeadObservation[]      @relation("LeadObservationDoctor")
+  leadCaseReportsCompleted      LeadCaseReport[]       @relation("LeadCaseReportDoctor")
+  leadCaseBillingsCompleted     LeadCaseBilling[]      @relation("LeadCaseBillingDoctor")
+  leadAssignmentsAsDoctor       LeadAssignment[]       @relation("LeadAssignmentDoctor")
+  reviewedDoctorApplications    DoctorApplication[]    @relation("DoctorApplicationReviewer")
+  createdFromDoctorApplication  DoctorApplication?     @relation("DoctorApplicationConvertedUser")
+  leadStatusHistoryAsActor      LeadStatusHistory[]
+}
+
+model DoctorApplication {
+  id               Int                     @id @default(autoincrement())
+  name             String
+  phone            String
+  whatsapp         String?
+  email            String?
+  address          String?
+  experience       String?
+  qualification    String?
+  note             String?
+  animalExpertise      String?  @db.Text
+  availableTimeText    String?  @db.Text
+  emergencyAvailable   Boolean  @default(false)
+  ownTransport         Boolean  @default(false)
+  /// Optional expected visit fee in BDT (whole taka).
+  expectedVisitCharge  Int?
+  shortBio             String?  @db.Text
+  /// URL to certificate/document until file upload exists.
+  certificateUrl       String?
+  /// Internal admin observation (not shown to applicant).
+  adminReviewNote      String?  @db.Text
+  status           DoctorApplicationStatus @default(NEW)
+  reviewedAt       DateTime?
+  reviewedByUserId Int?
+  reviewedBy       User?                   @relation("DoctorApplicationReviewer", fields: [reviewedByUserId], references: [id])
+  convertedUserId  Int?                    @unique
+  convertedUser    User?                   @relation("DoctorApplicationConvertedUser", fields: [convertedUserId], references: [id])
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  areas DoctorApplicationArea[]
+}
+
+model DoctorApplicationArea {
+  applicationId Int
+  areaId        Int
+  application   DoctorApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  area          Area              @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@id([applicationId, areaId])
+}
+
+model Lead {
+  id                  Int         @id @default(autoincrement())
+  customerName        String
+  phone               String
+  whatsapp            String?
+  /// Free-text area label from legacy submissions (optional).
+  area                String?
+  areaId              Int
+  selectedArea        Area        @relation(fields: [areaId], references: [id])
+  address             String?
+  /// Legacy free-text animal label; when `animalKind` is OTHER, use for detail.
+  animalType          String?
+  animalKind          AnimalKind?
+  animalCount         Int?
+  approxAgeText       String?
+  approxWeightKg      Int?
+  problemCategory     String?
+  problemDuration     String?
+  eatingStatus        String?
+  feverSuspected      Boolean?
+  bellyBloated        Boolean?
+  canWalk             Boolean?
+  problemDetails      String?
+  priority            LeadPriority            @default(NORMAL)
+  preferredContact    LeadContactPreference?
+  googleMapUrl        String?
+  /// JSON array of media URLs (photo/video). File upload TBD — see Q26-CMD-05+.
+  mediaUrls           String?                 @db.Text
+  preferredDate       DateTime?
+  preferredTime       String?
+  serviceRequirement  String
+  message             String?
+  status              LeadStatus  @default(NEW)
+  assignedDoctorId    Int?
+  assignedDoctor      User?       @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id])
+  source              String?
+  utmSource           String?
+  utmMedium           String?
+  utmCampaign         String?
+  utmContent          String?
+  utmTerm             String?
+  utmArea             String?
+  landingPath         String?
+  isPossibleDuplicate Boolean     @default(false)
+  duplicateOfLeadId   Int?
+  duplicateOf         Lead?       @relation("LeadDuplicateOf", fields: [duplicateOfLeadId], references: [id], onDelete: SetNull)
+  duplicateCopies     Lead[]      @relation("LeadDuplicateOf")
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  notes               LeadNote[]
+  notifications       Notification[]
+  observations        LeadObservation[]
+  assignments         LeadAssignment[]
+  caseReport          LeadCaseReport?
+  caseBilling         LeadCaseBilling?
+  statusHistory       LeadStatusHistory[]
+
+  @@index([priority])
+}
+
+/// Doctor-entered treatment record; draft until completedAt is set.
+model LeadCaseReport {
+  id                     Int       @id @default(autoincrement())
+  leadId                 Int       @unique
+  lead                   Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  /// Clinical observation / examination notes (draft-friendly).
+  observation            String?   @db.Text
+  doctorAdvice           String?   @db.Text
+  diagnosis              String?   @db.Text
+  treatmentGiven         String?   @db.Text
+  medicineAdvice         String?   @db.Text
+  followUpNeeded         Boolean   @default(false)
+  nextFollowUpAt         DateTime?
+  publicShowcaseEligible Boolean   @default(false)
+  /// Public-facing title — must not include customer PII (enforced in UI copy only).
+  showcaseTitle          String?
+  showcaseSummary        String?   @db.Text
+  completedAt            DateTime?
+  completedByDoctorId    Int?
+  completedBy            User?     @relation("LeadCaseReportDoctor", fields: [completedByDoctorId], references: [id])
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}
+
+/// Snapshot when a case is closed with billing: amounts, commission, settlement, invoice id.
+/// Clinical narrative may also exist on `LeadCaseReport`; this row is the financial + invoice source of truth.
+model LeadCaseBilling {
+  id        Int      @id @default(autoincrement())
+  leadId    Int      @unique
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  doctorId  Int
+  doctor    User     @relation("LeadCaseBillingDoctor", fields: [doctorId], references: [id])
+
+  completedAt DateTime
+  status      TreatmentCompletionStatus @default(COMPLETED)
+
+  observation   String? @db.Text
+  diagnosis     String? @db.Text
+  treatmentNote String? @db.Text
+  /// Free-text list of medicines (structured lines optional below).
+  medicinesUsed String? @db.Text
+  /// Optional structured lines, e.g. [{ "name": "...", "qty": 1, "amount": 100 }].
+  medicineLines Json?
+
+  serviceFee      Int @default(0)
+  medicineCharge  Int @default(0)
+  transportCharge Int @default(0)
+  emergencyCharge Int @default(0)
+  otherCharge     Int @default(0)
+  discountAmount  Int @default(0)
+
+  /// service + medicine + transport + emergency + other - discount (whole BDT).
+  grossAmount Int @default(0)
+  totalCollected Int @default(0)
+  dueAmount      Int @default(0)
+
+  paymentMethod PaymentMethod
+
+  commissionableAmount       Int   @default(0)
+  /// Percent snapshot at billing time, e.g. 10.0 means 10%.
+  platformCommissionRate     Float @default(0)
+  platformCommissionAmount     Int   @default(0)
+  doctorEarningAmount          Int   @default(0)
+  doctorPayableToPlatform      Int   @default(0)
+  settlementStatus             SettlementStatus @default(UNSETTLED)
+
+  followUpRequired Boolean   @default(false)
+  followUpAt       DateTime?
+
+  /// Human-readable unique invoice reference (assigned when billing is created).
+  invoiceNo String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([doctorId])
+  @@index([doctorId, completedAt])
+  @@index([settlementStatus])
+}
+
+model LeadStatusHistory {
+  id          Int         @id @default(autoincrement())
+  leadId      Int
+  lead        Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  fromStatus  LeadStatus?
+  toStatus    LeadStatus
+  actorKind   String
+  actorUserId Int?
+  actor       User?       @relation(fields: [actorUserId], references: [id])
+  note        String?
+  createdAt   DateTime    @default(now())
+
+  @@index([leadId])
+}
+
+model LeadObservation {
+  id        Int      @id @default(autoincrement())
+  leadId    Int
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  doctorId  Int
+  doctor    User     @relation("LeadObservationDoctor", fields: [doctorId], references: [id])
+  condition String?
+  note      String?
+  visitedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([doctorId])
+}
+
+model LeadAssignment {
+  id               Int       @id @default(autoincrement())
+  leadId           Int
+  lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  doctorId         Int
+  doctor           User      @relation("LeadAssignmentDoctor", fields: [doctorId], references: [id])
+  assignedAt       DateTime  @default(now())
+  unassignedAt     DateTime?
+  assignedByUserId Int?
+
+  @@index([leadId])
+}
+
+model Notification {
+  id              Int                  @id @default(autoincrement())
+  type            NotificationType
+  channel         NotificationChannel
+  status          NotificationStatus   @default(PENDING)
+  leadId          Int?
+  lead            Lead?                @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  recipientName   String?
+  recipientPhone  String?
+  message         String
+  errorMessage    String?
+  createdAt       DateTime             @default(now())
+  sentAt          DateTime?
+}
+
+model LeadNote {
+  id        Int      @id @default(autoincrement())
+  leadId    Int
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  note      String
+  createdBy String?
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/* Qurbani 2026 — premium mobile app shell (light theme) */
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+
+  --q-canvas: #e8ece9;
+  /** Public landing outer canvas (mint-white) */
+  --q-landing-canvas: #eef5f1;
+  --q-shell-max: 430px;
+  --q-shell-min: 390px;
+  --q-shell-wide: min(72rem, calc(100vw - 1.5rem));
+  /** Landing column cap (~960px) */
+  --q-landing-inner-max: min(960px, calc(100vw - 2rem));
+
+  --q-primary: #0d6845;
+  --q-primary-deep: #064e3b;
+  --q-primary-soft: #ecfdf5;
+  --q-accent-gold: #c9a227;
+  --q-accent-gold-hover: #b89220;
+  --q-danger: #b91c1c;
+  --q-warning: #b45309;
+  --q-info: #0369a1;
+
+  --q-muted: #64748b;
+  --q-border: #e2e8f0;
+
+  --q-card-radius: 22px;
+  --q-card-shadow: 0 10px 40px -12px rgba(15, 23, 42, 0.12),
+    0 4px 16px -8px rgba(15, 23, 42, 0.08);
+  --q-card-shadow-sm: 0 4px 20px -8px rgba(15, 23, 42, 0.1);
+
+  --q-header-gradient: linear-gradient(
+    135deg,
+    var(--q-primary-deep) 0%,
+    var(--q-primary) 48%,
+    #0f766e 100%
+  );
+
+  --q-touch-min: 48px;
+}
+
+/* Brand header fill (shared AppHeader + admin portal) — solid fallback if gradient fails */
+.bg-q-header-gradient {
+  background-color: var(--q-primary-deep);
+  background-image: var(--q-header-gradient);
+}
+
+/* Alias: main content clearance when a fixed bottom nav is shown (doctor/admin mobile). */
+.pb-app-bottom-safe {
+  padding-bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-app-sans), var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono);
+
+  --color-q-primary: var(--q-primary);
+  --color-q-primary-deep: var(--q-primary-deep);
+  --color-q-primary-soft: var(--q-primary-soft);
+  --color-q-gold: var(--q-accent-gold);
+  --color-q-muted: var(--q-muted);
+  --color-q-canvas: var(--q-canvas);
+  --color-q-danger: var(--q-danger);
+  --shadow-q-card: var(--q-card-shadow);
+}
+
+html {
+  overflow-x: clip;
+  color-scheme: only light;
+}
+
+body {
+  min-width: 0;
+  overflow-x: clip;
+  background: var(--q-canvas);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: rgba(13, 104, 69, 0.12);
+  text-rendering: optimizeLegibility;
+}
+
+/* Bottom nav / safe area padding helper */
+.pb-app-nav {
+  padding-bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.pt-app-header {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Native dialog backdrop (CustomerDialog) */
+.app-customer-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}

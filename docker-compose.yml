@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: qurbani_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: qurbani_user
+      POSTGRES_PASSWORD: qurbani_pass
+      POSTGRES_DB: qurbani_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - qurbani_pgdata:/var/lib/postgresql/data
+
+volumes:
+  qurbani_pgdata:
