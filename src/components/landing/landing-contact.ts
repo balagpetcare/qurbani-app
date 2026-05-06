@@ -15,8 +15,8 @@ function digitsOnly(input: string): string {
 }
 
 /**
- * Public landing `tel:` links — uses `tel:01881227204` for the official helpline when the
- * configured line matches {@link OFFICIAL_CALL_NUMBER_DIGITS}; otherwise {@link bangladeshTelHref}.
+ * Public landing `tel:` links — uses {@link OFFICIAL_CALL_NUMBER_TEL} when the configured line
+ * matches {@link OFFICIAL_CALL_NUMBER_DIGITS}; otherwise {@link bangladeshTelHref}.
  */
 export function landingTelHref(contactRaw: string): string {
   const cleaned = contactRaw.trim();
