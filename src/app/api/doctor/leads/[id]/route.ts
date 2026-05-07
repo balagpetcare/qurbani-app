@@ -36,6 +36,12 @@ export async function GET(request: Request, context: RouteContext) {
           },
         },
         selectedArea: true,
+        caseReport: {
+          select: {
+            completedAt: true,
+            publicShowcaseEligible: true,
+          },
+        },
         notes: { orderBy: { createdAt: "desc" }, take: 50 },
         observations: {
           orderBy: { visitedAt: "desc" },
@@ -59,9 +65,15 @@ export async function GET(request: Request, context: RouteContext) {
       doctorUserId: auth.user.id,
     });
 
+    const publicCaseHistory = await prisma.publicCaseHistory.findUnique({
+      where: { sourceLeadId: id },
+      select: { id: true, status: true },
+    });
+
     return NextResponse.json({
       lead: payload,
       contactVisible,
+      publicCaseHistory,
     });
   } catch (err) {
     console.error("GET /api/doctor/leads/[id]", err);

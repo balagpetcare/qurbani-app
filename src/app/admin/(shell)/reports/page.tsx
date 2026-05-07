@@ -7,7 +7,10 @@ import { AdminMain } from "@/components/admin/ui/AdminMain";
 import { AdminResponsiveTable } from "@/components/admin/ui/AdminResponsiveTable";
 import { LeadStatus, UserRole } from "@/generated/prisma/enums";
 import { adminLeadDetailPath } from "@/lib/admin-routes";
-import { doctorLeadActionableVisibilityWhereFromAreaIds } from "@/lib/doctor-lead-access";
+import {
+  collectAreaTextMatchFragments,
+  doctorLeadActionableVisibilityWhereFromAreaIds,
+} from "@/lib/doctor-lead-access";
 import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
@@ -64,7 +67,7 @@ export default async function AdminDoctorReportsPage() {
       doctorAreas: {
         select: {
           areaId: true,
-          area: { select: { name: true, nameBn: true } },
+          area: { select: { name: true, nameBn: true, nameEn: true } },
         },
       },
     },
@@ -74,10 +77,14 @@ export default async function AdminDoctorReportsPage() {
   const rows = await Promise.all(
     doctors.map(async (d) => {
       const aid = d.doctorAreas.map((x) => x.areaId);
+      const fragments = collectAreaTextMatchFragments(
+        d.doctorAreas.map((x) => x.area),
+      );
 
       const visibilityWhere = doctorLeadActionableVisibilityWhereFromAreaIds(
         d.id,
         aid,
+        fragments,
       );
 
       const [

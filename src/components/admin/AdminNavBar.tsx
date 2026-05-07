@@ -29,7 +29,7 @@ export function AdminNavBar({
     { href: "/admin/requests", label: "অনুরোধ ও লিড" },
     { href: "/admin/doctors", label: "ডাক্তার" },
     { href: "/admin/doctor-applications", label: "ডাক্তার আবেদন" },
-    { href: "/admin/areas", label: "এলাকা" },
+    { href: "/admin/areas", label: "এলাকা ব্যবস্থাপনা" },
     { href: "/admin/reports", label: "রিপোর্ট" },
     { href: "/admin/notifications", label: "নোটিফিকেশন" },
   ];

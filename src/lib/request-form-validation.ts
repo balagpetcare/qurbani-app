@@ -5,6 +5,7 @@ export type RequestFormField =
   | "phone"
   | "whatsapp"
   | "areaId"
+  | "customArea"
   | "animalKind"
   | "animalTypeOther"
   | "problemSummary";
@@ -15,6 +16,7 @@ export const REQUEST_FIELD_IDS: Record<RequestFormField, string> = {
   phone: "request-phone",
   whatsapp: "request-whatsapp",
   areaId: "request-area",
+  customArea: "request-customArea",
   animalKind: "request-animalKind",
   animalTypeOther: "request-animalTypeOther",
   problemSummary: "request-problemSummary",
@@ -26,6 +28,7 @@ export const REQUEST_FIELD_ORDER: RequestFormField[] = [
   "phone",
   "whatsapp",
   "areaId",
+  "customArea",
   "animalKind",
   "animalTypeOther",
   "problemSummary",
@@ -37,7 +40,9 @@ export const MSG = {
   phoneRequired: "মোবাইল নম্বর দিন।",
   phoneInvalid: "সঠিক বাংলাদেশি মোবাইল নম্বর দিন।",
   whatsappInvalid: "নম্বরটি সঠিক নয়। খালি রাখুন বা ঠিক করে লিখুন।",
-  areaRequired: "এলাকা বেছে নিন।",
+  areaRequired: "অনুগ্রহ করে আপনার এলাকা নির্বাচন করুন।",
+  customAreaRequired:
+    "আপনার এলাকা তালিকায় না থাকলে ‘অন্যান্য’ নির্বাচন করে এলাকার নাম লিখুন।",
   animalRequired: "পশুর ধরন বেছে নিন।",
   animalOtherRequired: "কী পশু তা এক লাইনে লিখুন।",
   problemRequired: "সমস্যাটা সংক্ষেপে লিখুন।",
@@ -45,11 +50,15 @@ export const MSG = {
 
 const NAME_MAX = 200;
 
+export type AreaPickMode = "list" | "other";
+
 export type RequestFormValues = {
   customerName: string;
   phone: string;
   whatsapp: string;
+  areaMode: AreaPickMode;
   areaId: number | "";
+  customArea: string;
   animalKind: string;
   animalTypeOther: string;
   problemSummary: string;
@@ -80,8 +89,15 @@ export function validateRequestForm(
     errors.whatsapp = MSG.whatsappInvalid;
   }
 
-  if (v.areaId === "" || !allowedAreaIds.has(v.areaId)) {
-    errors.areaId = MSG.areaRequired;
+  if (v.areaMode === "list") {
+    if (v.areaId === "" || !allowedAreaIds.has(v.areaId)) {
+      errors.areaId = MSG.areaRequired;
+    }
+  } else {
+    const custom = v.customArea.trim();
+    if (custom.length < 2) {
+      errors.customArea = MSG.customAreaRequired;
+    }
   }
 
   const ak = v.animalKind.trim();

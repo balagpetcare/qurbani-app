@@ -14,6 +14,12 @@ type Props = {
   onChange: (ids: number[]) => void;
 };
 
+function areaLineLabel(a: AreaOption): string {
+  if (a.nameBn?.trim()) return a.nameBn.trim();
+  if (a.nameEn?.trim()) return a.nameEn.trim();
+  return a.name;
+}
+
 export function SearchableAreaMultiSelect({
   areas,
   label,
@@ -34,8 +40,9 @@ export function SearchableAreaMultiSelect({
     if (!q) return areas;
     return areas.filter((a) => {
       const en = a.name.toLowerCase();
+      const en2 = (a.nameEn ?? "").toLowerCase();
       const bn = (a.nameBn ?? "").toLowerCase();
-      return en.includes(q) || bn.includes(q);
+      return en.includes(q) || en2.includes(q) || bn.includes(q);
     });
   }, [areas, query]);
 
@@ -93,7 +100,7 @@ export function SearchableAreaMultiSelect({
                 >
                   {selected.has(a.id) ? "✓" : ""}
                 </span>
-                <span>{a.nameBn ? `${a.name} (${a.nameBn})` : a.name}</span>
+                <span>{areaLineLabel(a)}</span>
               </button>
             </li>
           ))}
@@ -110,7 +117,7 @@ export function SearchableAreaMultiSelect({
                 key={id}
                 className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-900 ring-1 ring-emerald-200"
               >
-                {a.nameBn ? `${a.name}` : a.name}
+                {areaLineLabel(a)}
                 <button
                   type="button"
                   className="rounded-full p-0.5 hover:bg-emerald-100"

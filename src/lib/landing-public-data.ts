@@ -2,12 +2,18 @@ import type { Prisma } from "@/generated/prisma/client";
 import { LeadStatus, UserRole } from "@/generated/prisma/enums";
 
 import { prisma } from "@/lib/prisma";
+import {
+  publicCustomerAreaOrderBy,
+  publicCustomerAreaWhere,
+} from "@/lib/public-areas";
 import { toPublicDoctorCard, type PublicDoctorCard } from "@/lib/public-doctor";
 
 export type LandingAreaChip = {
   id: number;
   name: string;
   nameBn: string | null;
+  nameEn: string | null;
+  isPopular: boolean;
 };
 
 /** @deprecated Prefer {@link PublicDoctorCard} from `@/lib/public-doctor`. */
@@ -34,9 +40,15 @@ type PublicDoctorDbRow = Prisma.UserGetPayload<{ select: typeof publicDoctorSele
 
 export async function getLandingAreas(): Promise<LandingAreaChip[]> {
   return prisma.area.findMany({
-    where: { isActive: true },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, nameBn: true },
+    where: publicCustomerAreaWhere,
+    orderBy: publicCustomerAreaOrderBy,
+    select: {
+      id: true,
+      name: true,
+      nameBn: true,
+      nameEn: true,
+      isPopular: true,
+    },
   });
 }
 

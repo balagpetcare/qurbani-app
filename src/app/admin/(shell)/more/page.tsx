@@ -8,6 +8,16 @@ import { AdminMain } from "@/components/admin/ui/AdminMain";
 export const dynamic = "force-dynamic";
 
 const links = [
+  {
+    href: "/admin/moderation/tutorials",
+    label: "টিউটোরিয়াল মডারেশন",
+    desc: "ডাক্তারদের ভিডিও বিষয়বস্তু অনুমোদন",
+  },
+  {
+    href: "/admin/moderation/case-histories",
+    label: "পাবলিক কেস হিস্ট্রি",
+    desc: "অনামীকৃত কেস শোকেস অনুমোদন",
+  },
   { href: "/admin/doctor-applications", label: "ডাক্তার আবেদন", desc: "আবেদন পর্যালোচনা ও অনুমোদন" },
   { href: "/admin/areas", label: "এলাকা ব্যবস্থাপনা", desc: "সেবার এলাকা ও পরিসংখ্যান" },
   { href: "/admin/notifications", label: "নোটিফিকেশন", desc: "কিউ ও বার্তা" },

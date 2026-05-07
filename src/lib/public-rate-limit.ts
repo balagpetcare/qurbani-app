@@ -129,3 +129,221 @@ export function assertDoctorApplicationAllowed(
     { status: 429, headers: { "Content-Type": "application/json" } },
   );
 }
+
+/** Anonymous mobile media upload-url / ingest: per-IP only. */
+export function assertMobileMediaUploadAllowed(request: Request): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `media:ip:${ip}`,
+      limit: Number(process.env.PUBLIC_MEDIA_UPLOAD_RATE_IP_LIMIT ?? 40),
+      windowMs: Number(process.env.PUBLIC_MEDIA_UPLOAD_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** POST /api/mobile/otp/start — per IP + per normalized phone. */
+export function assertMobileOtpStartAllowed(
+  request: Request,
+  normalizedPhone: string,
+): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `otp:start:ip:${ip}`,
+      limit: Number(process.env.PUBLIC_OTP_START_RATE_IP_LIMIT ?? 40),
+      windowMs: Number(process.env.PUBLIC_OTP_START_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+    {
+      key: `otp:start:phone:${normalizedPhone}`,
+      limit: Number(process.env.PUBLIC_OTP_START_RATE_PHONE_LIMIT ?? 6),
+      windowMs: Number(process.env.PUBLIC_OTP_START_RATE_PHONE_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** POST /api/mobile/otp/verify — per IP + per phone (tighter than start). */
+export function assertMobileOtpVerifyAllowed(
+  request: Request,
+  normalizedPhone: string,
+): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `otp:verify:ip:${ip}`,
+      limit: Number(process.env.PUBLIC_OTP_VERIFY_RATE_IP_LIMIT ?? 80),
+      windowMs: Number(process.env.PUBLIC_OTP_VERIFY_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+    {
+      key: `otp:verify:phone:${normalizedPhone}`,
+      limit: Number(process.env.PUBLIC_OTP_VERIFY_RATE_PHONE_LIMIT ?? 20),
+      windowMs: Number(process.env.PUBLIC_OTP_VERIFY_RATE_PHONE_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** GET public tutorial list/detail — per client IP. */
+export function assertPublicTutorialReadAllowed(request: Request): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `tutorials:read:ip:${ip}`,
+      limit: Number(process.env.PUBLIC_TUTORIAL_READ_RATE_IP_LIMIT ?? 120),
+      windowMs: Number(process.env.PUBLIC_TUTORIAL_READ_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** Doctor tutorial writes (create / patch / submit). */
+export function assertDoctorTutorialWriteAllowed(
+  request: Request,
+  doctorUserId: number,
+): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `tutorials:write:doctor:${doctorUserId}`,
+      limit: Number(process.env.DOCTOR_TUTORIAL_WRITE_RATE_USER_LIMIT ?? 60),
+      windowMs: Number(process.env.DOCTOR_TUTORIAL_WRITE_RATE_USER_WINDOW_MS ?? 3_600_000),
+    },
+    {
+      key: `tutorials:write:ip:${ip}`,
+      limit: Number(process.env.DOCTOR_TUTORIAL_WRITE_RATE_IP_LIMIT ?? 120),
+      windowMs: Number(process.env.DOCTOR_TUTORIAL_WRITE_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** Authenticated content reports — per user + IP. */
+export function assertContentReportAllowed(
+  request: Request,
+  reporterUserId: number,
+): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `report:user:${reporterUserId}`,
+      limit: Number(process.env.CONTENT_REPORT_RATE_USER_LIMIT ?? 20),
+      windowMs: Number(process.env.CONTENT_REPORT_RATE_USER_WINDOW_MS ?? 3_600_000),
+    },
+    {
+      key: `report:ip:${ip}`,
+      limit: Number(process.env.CONTENT_REPORT_RATE_IP_LIMIT ?? 40),
+      windowMs: Number(process.env.CONTENT_REPORT_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** User block create/delete — per user + IP. */
+export function assertUserBlockWriteAllowed(
+  request: Request,
+  blockerUserId: number,
+): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `userblock:user:${blockerUserId}`,
+      limit: Number(process.env.USER_BLOCK_RATE_USER_LIMIT ?? 40),
+      windowMs: Number(process.env.USER_BLOCK_RATE_USER_WINDOW_MS ?? 3_600_000),
+    },
+    {
+      key: `userblock:ip:${ip}`,
+      limit: Number(process.env.USER_BLOCK_RATE_IP_LIMIT ?? 80),
+      windowMs: Number(process.env.USER_BLOCK_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** GET public case history list/detail — per client IP. */
+export function assertPublicCaseHistoryReadAllowed(request: Request): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `casehistories:read:ip:${ip}`,
+      limit: Number(process.env.PUBLIC_CASE_HISTORY_READ_RATE_IP_LIMIT ?? 120),
+      windowMs: Number(process.env.PUBLIC_CASE_HISTORY_READ_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** Doctor public case history submit from lead. */
+export function assertDoctorCaseHistoryWriteAllowed(
+  request: Request,
+  doctorUserId: number,
+): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `casehistories:write:doctor:${doctorUserId}`,
+      limit: Number(process.env.DOCTOR_CASE_HISTORY_WRITE_RATE_USER_LIMIT ?? 40),
+      windowMs: Number(process.env.DOCTOR_CASE_HISTORY_WRITE_RATE_USER_WINDOW_MS ?? 3_600_000),
+    },
+    {
+      key: `casehistories:write:ip:${ip}`,
+      limit: Number(process.env.DOCTOR_CASE_HISTORY_WRITE_RATE_IP_LIMIT ?? 80),
+      windowMs: Number(process.env.DOCTOR_CASE_HISTORY_WRITE_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** POST /api/mobile/auth/social — per client IP. */
+export function assertMobileSocialAuthAllowed(request: Request): Response | null {
+  const ip = getClientIp(request);
+  const ok = tryConsumeAllRateLimits([
+    {
+      key: `social:auth:ip:${ip}`,
+      limit: Number(process.env.MOBILE_SOCIAL_AUTH_RATE_IP_LIMIT ?? 40),
+      windowMs: Number(process.env.MOBILE_SOCIAL_AUTH_RATE_IP_WINDOW_MS ?? 3_600_000),
+    },
+  ]);
+  if (ok) return null;
+  return new Response(
+    JSON.stringify({ error: PUBLIC_RATE_LIMIT_MESSAGE_BN }),
+    { status: 429, headers: { "Content-Type": "application/json" } },
+  );
+}

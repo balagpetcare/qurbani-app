@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { LeadStatus, UserRole } from "@/generated/prisma/enums";
 import { requireAdminFromRequest } from "@/lib/auth-guards";
-import { doctorLeadVisibilityWhereFromAreaIds } from "@/lib/doctor-lead-access";
+import {
+  collectAreaTextMatchFragments,
+  doctorLeadVisibilityWhereFromAreaIds,
+} from "@/lib/doctor-lead-access";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
@@ -20,12 +23,17 @@ export async function GET(request: Request) {
       doctors.map(async (d) => {
         const areas = await prisma.doctorArea.findMany({
           where: { userId: d.id },
-          select: { areaId: true },
+          select: {
+            areaId: true,
+            area: { select: { name: true, nameBn: true, nameEn: true } },
+          },
         });
         const areaIds = areas.map((a) => a.areaId);
+        const fragments = collectAreaTextMatchFragments(areas.map((a) => a.area));
         const visibilityWhere = doctorLeadVisibilityWhereFromAreaIds(
           d.id,
           areaIds,
+          fragments,
         );
 
         const [

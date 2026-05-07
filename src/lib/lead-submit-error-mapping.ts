@@ -15,7 +15,15 @@ export function mapLeadApiErrorToFields(
       out.phone = MSG.phoneRequired;
       break;
     case "areaId is required":
+    case "AREA_SELECTION_REQUIRED":
       out.areaId = MSG.areaRequired;
+      break;
+    case "CUSTOM_AREA_REQUIRED":
+      out.customArea = MSG.customAreaRequired;
+      break;
+    case "AREA_AMBIGUOUS":
+      out.areaId = MSG.areaRequired;
+      out.customArea = MSG.customAreaRequired;
       break;
     case "serviceRequirement is required":
       out.problemSummary = MSG.problemRequired;

@@ -3,6 +3,57 @@ import { LeadPriority, LeadStatus } from "@/generated/prisma/enums";
 
 import { prisma } from "@/lib/prisma";
 
+export type DoctorAreaNameSnapshot = {
+  name: string;
+  nameBn: string | null;
+  nameEn: string | null;
+};
+
+/** Collect unique substrings for loose matching on free-text `Lead.area` (custom এলাকা). */
+export function collectAreaTextMatchFragments(
+  areas: DoctorAreaNameSnapshot[],
+): string[] {
+  const out = new Set<string>();
+  for (const a of areas) {
+    for (const raw of [a.nameBn, a.nameEn, a.name]) {
+      const t = raw?.trim();
+      if (t && t.length >= 2) out.add(t);
+    }
+  }
+  return [...out];
+}
+
+function customAreaVisibilityClauses(
+  doctorUserId: number,
+  fragments: string[],
+): Prisma.LeadWhereInput[] {
+  if (fragments.length === 0) return [];
+
+  const textOr: Prisma.LeadWhereInput[] = fragments.map((f) => ({
+    area: { contains: f, mode: "insensitive" },
+  }));
+
+  return [
+    {
+      AND: [
+        { assignedDoctorId: null },
+        { areaId: null },
+        { area: { not: null } },
+        { OR: textOr },
+      ],
+    },
+    {
+      AND: [
+        { assignedDoctorId: { not: null } },
+        { assignedDoctorId: { not: doctorUserId } },
+        { areaId: null },
+        { area: { not: null } },
+        { OR: textOr },
+      ],
+    },
+  ];
+}
+
 /**
  * Same rules as {@link buildDoctorLeadWhere}, for callers that already have area ids
  * (e.g. admin reports). Includes peer-assigned leads in listed areas.
@@ -10,6 +61,7 @@ import { prisma } from "@/lib/prisma";
 export function doctorLeadVisibilityWhereFromAreaIds(
   doctorUserId: number,
   areaIds: number[],
+  textMatchFragments: string[] = [],
 ): Prisma.LeadWhereInput {
   const assignedToMe: Prisma.LeadWhereInput = {
     assignedDoctorId: doctorUserId,
@@ -31,6 +83,8 @@ export function doctorLeadVisibilityWhereFromAreaIds(
     });
   }
 
+  or.push(...customAreaVisibilityClauses(doctorUserId, textMatchFragments));
+
   return { OR: or };
 }
 
@@ -38,19 +92,25 @@ export function doctorLeadVisibilityWhereFromAreaIds(
  * Area-based visibility for doctors:
  * - Leads **assigned** to this doctor (any area).
  * - **Unassigned** leads whose `areaId` is in the doctor's `DoctorArea` list.
+ * - **Custom-area** leads (`areaId` null) when `Lead.area` loosely matches a covered area label.
  * - Leads **assigned to another doctor** in those same areas (privacy-safe list/detail
  *   previews — contact fields are stripped server-side until the viewer is assignee).
  */
 export async function buildDoctorLeadWhere(
   doctorUserId: number,
 ): Promise<Prisma.LeadWhereInput> {
-  const areas = await prisma.doctorArea.findMany({
+  const rows = await prisma.doctorArea.findMany({
     where: { userId: doctorUserId },
-    select: { areaId: true },
+    select: {
+      areaId: true,
+      area: { select: { name: true, nameBn: true, nameEn: true } },
+    },
   });
+  const fragments = collectAreaTextMatchFragments(rows.map((r) => r.area));
   return doctorLeadVisibilityWhereFromAreaIds(
     doctorUserId,
-    areas.map((a) => a.areaId),
+    rows.map((a) => a.areaId),
+    fragments,
   );
 }
 
@@ -134,15 +194,17 @@ export function mergeDoctorLeadListFilters(
 export function doctorLeadActionableVisibilityWhereFromAreaIds(
   doctorUserId: number,
   areaIds: number[],
+  textMatchFragments: string[] = [],
 ): Prisma.LeadWhereInput {
   return {
     AND: [
-      doctorLeadVisibilityWhereFromAreaIds(doctorUserId, areaIds),
+      doctorLeadVisibilityWhereFromAreaIds(
+        doctorUserId,
+        areaIds,
+        textMatchFragments,
+      ),
       {
-        OR: [
-          { assignedDoctorId: doctorUserId },
-          { assignedDoctorId: null },
-        ],
+        OR: [{ assignedDoctorId: doctorUserId }, { assignedDoctorId: null }],
       },
     ],
   };
@@ -182,10 +244,7 @@ export async function buildDoctorActionableLeadWhere(
     AND: [
       wide,
       {
-        OR: [
-          { assignedDoctorId: doctorUserId },
-          { assignedDoctorId: null },
-        ],
+        OR: [{ assignedDoctorId: doctorUserId }, { assignedDoctorId: null }],
       },
     ],
   };

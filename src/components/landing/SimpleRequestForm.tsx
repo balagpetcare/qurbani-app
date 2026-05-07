@@ -22,6 +22,7 @@ import {
   resolveLeadSubmitFailureMessage,
 } from "@/lib/lead-submit-error-mapping";
 import {
+  AreaPickMode,
   focusRequestField,
   REQUEST_FIELD_IDS,
   REQUEST_FIELD_ORDER,
@@ -30,7 +31,13 @@ import {
 } from "@/lib/request-form-validation";
 import { utmPayloadFromSearchParams } from "@/lib/utm-from-search";
 
-type AreaOpt = { id: number; name: string; nameBn: string | null };
+type AreaOpt = {
+  id: number;
+  name: string;
+  nameBn: string | null;
+  nameEn: string | null;
+  isPopular: boolean;
+};
 
 const ANIMAL_OPTIONS: { value: string; label: string }[] = [
   { value: "CATTLE", label: "গরু" },
@@ -45,6 +52,7 @@ const ERR_ID: Record<RequestFormField, string> = {
   phone: "request-err-phone",
   whatsapp: "request-err-whatsapp",
   areaId: "request-err-areaId",
+  customArea: "request-err-customArea",
   animalKind: "request-err-animalKind",
   animalTypeOther: "request-err-animalTypeOther",
   problemSummary: "request-err-problemSummary",
@@ -101,14 +109,23 @@ export function SimpleRequestForm({
   const [serverMessageBn, setServerMessageBn] = useState<string>("");
 
   const [animalKind, setAnimalKind] = useState("");
+  const [areaMode, setAreaMode] = useState<AreaPickMode>(() =>
+    initialAreas.length === 0 ? "other" : "list",
+  );
   const [areaId, setAreaId] = useState<number | "">(() =>
     initialAreaSelection(initialAreas, prefillAreaId),
   );
+  const [customArea, setCustomArea] = useState("");
 
   const telHref = landingTelHref(phoneDigits);
   const waHref = landingWhatsAppHref(whatsAppDigits);
   const showOtherAnimal = animalKind === "OTHER";
   const areasUnavailable = initialAreas.length === 0;
+
+  const popularAreas = useMemo(
+    () => initialAreas.filter((a) => a.isPopular),
+    [initialAreas],
+  );
 
   const allowedAreaIds = useMemo(
     () => new Set(initialAreas.map((a) => a.id)),
@@ -123,6 +140,18 @@ export function SimpleRequestForm({
       return next;
     });
   }, []);
+
+  const setListAreaMode = useCallback(() => {
+    setAreaMode("list");
+    setCustomArea("");
+    clearFieldError("customArea");
+  }, [clearFieldError]);
+
+  const setOtherAreaMode = useCallback(() => {
+    setAreaMode("other");
+    setAreaId("");
+    clearFieldError("areaId");
+  }, [clearFieldError]);
 
   const runSubmit = useCallback(async () => {
     const form = formRef.current;
@@ -140,11 +169,21 @@ export function SimpleRequestForm({
       if (!Number.isNaN(n) && n > 0) parsedArea = n;
     }
 
+    const effectiveAreaMode: AreaPickMode =
+      areasUnavailable ? "other" : areaMode;
+    const effectiveParsedArea =
+      effectiveAreaMode === "list" ? parsedArea : "";
+
     const v = {
       customerName: String(fd.get("customerName") ?? ""),
       phone: String(fd.get("phone") ?? ""),
       whatsapp: String(fd.get("whatsapp") ?? ""),
-      areaId: parsedArea,
+      areaMode: effectiveAreaMode,
+      areaId: effectiveParsedArea,
+      customArea:
+        effectiveAreaMode === "other"
+          ? customArea.trim() || String(fd.get("customArea") ?? "")
+          : "",
       animalKind: String(fd.get("animalKind") ?? ""),
       animalTypeOther: String(fd.get("animalTypeOther") ?? ""),
       problemSummary: String(fd.get("problemSummary") ?? ""),
@@ -189,7 +228,6 @@ export function SimpleRequestForm({
       customerName: v.customerName.trim(),
       phone: v.phone.trim(),
       whatsapp: v.whatsapp.trim() || undefined,
-      areaId: parsedArea === "" ? undefined : parsedArea,
       address: String(fd.get("address") ?? "").trim() || undefined,
       animalKind: v.animalKind.trim() || undefined,
       animalTypeOther: v.animalTypeOther.trim() || undefined,
@@ -199,6 +237,14 @@ export function SimpleRequestForm({
       ...utm,
       landingPath,
     };
+
+    if (effectiveAreaMode === "list") {
+      if (effectiveParsedArea !== "") {
+        payload.areaId = effectiveParsedArea;
+      }
+    } else {
+      payload.customArea = v.customArea.trim();
+    }
 
     setLoading(true);
     setNetworkDialogOpen(false);
@@ -242,7 +288,13 @@ export function SimpleRequestForm({
     } finally {
       setLoading(false);
     }
-  }, [allowedAreaIds, emergencyLeadEnabled]);
+  }, [
+    allowedAreaIds,
+    areaMode,
+    areasUnavailable,
+    customArea,
+    emergencyLeadEnabled,
+  ]);
 
   const onSubmit = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
@@ -257,7 +309,9 @@ export function SimpleRequestForm({
     if (form) {
       form.reset();
       setAnimalKind("");
+      setAreaMode(initialAreas.length === 0 ? "other" : "list");
       setAreaId(initialAreaSelection(initialAreas, prefillAreaId));
+      setCustomArea("");
     }
     setSuccessDialogOpen(false);
     const q = successLeadId
@@ -445,7 +499,8 @@ export function SimpleRequestForm({
               className="mt-6 rounded-xl bg-amber-50 px-4 py-3 text-base text-amber-950 ring-1 ring-amber-200"
               role="status"
             >
-              এলাকার তালিকা আসেনি। রিফ্রেশ করুন, নয়তো কল বা WhatsApp করুন।
+              তালিকা থেকে এলাকা আসেনি। নিচে “অন্যান্য” থেকে এলাকার নাম লিখুন, অথবা কল /
+              WhatsApp করুন।
             </div>
           ) : null}
 
@@ -572,24 +627,128 @@ export function SimpleRequestForm({
                 এলাকা ও পশুর তথ্য
               </legend>
 
-              <div className="scroll-mt-24">
-                <SearchableAreaSelect
-                  id={REQUEST_FIELD_IDS.areaId}
-                  areas={initialAreas}
-                  name="areaId"
-                  label="সেবার এলাকা"
-                  required
-                  disabled={areasUnavailable}
-                  placeholder="টাইপ করে খুঁজে বেছে নিন"
-                  hint="যে এলাকায় দরকার।"
-                  value={areaId}
-                  onChange={(id) => {
-                    setAreaId(id);
-                    clearFieldError("areaId");
-                  }}
-                  error={fieldErrors.areaId}
-                  errorId={ERR_ID.areaId}
-                />
+              <div className="scroll-mt-24 space-y-4">
+                {!areasUnavailable ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setListAreaMode();
+                      }}
+                      className={`min-h-[44px] touch-manipulation rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
+                        areaMode === "list"
+                          ? "bg-emerald-700 text-white ring-emerald-700"
+                          : "bg-white text-emerald-900 ring-emerald-200 hover:bg-emerald-50"
+                      }`}
+                    >
+                      তালিকা থেকে
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtherAreaMode();
+                      }}
+                      className={`min-h-[44px] touch-manipulation rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
+                        areaMode === "other"
+                          ? "bg-emerald-700 text-white ring-emerald-700"
+                          : "bg-white text-emerald-900 ring-emerald-200 hover:bg-emerald-50"
+                      }`}
+                    >
+                      অন্যান্য / আমার এলাকা তালিকায় নেই
+                    </button>
+                  </div>
+                ) : null}
+
+                {areaMode === "list" && !areasUnavailable ? (
+                  <>
+                    {popularAreas.length > 0 ? (
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-800">
+                          জনপ্রিয় এলাকা
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {popularAreas.map((a) => {
+                            const active = areaId === a.id;
+                            return (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => {
+                                  setListAreaMode();
+                                  setAreaId(a.id);
+                                  clearFieldError("areaId");
+                                }}
+                                className={`max-w-full min-h-[44px] touch-manipulation break-words rounded-full px-3 py-2 text-center text-sm font-semibold leading-snug ring-1 transition ${
+                                  active
+                                    ? "bg-emerald-700 text-white ring-emerald-700"
+                                    : "bg-emerald-50 text-emerald-950 ring-emerald-200 hover:bg-emerald-100"
+                                }`}
+                              >
+                                {a.nameBn ?? a.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <SearchableAreaSelect
+                      id={REQUEST_FIELD_IDS.areaId}
+                      areas={initialAreas}
+                      name="areaId"
+                      label="সেবার এলাকা"
+                      required
+                      disabled={areasUnavailable}
+                      placeholder="টাইপ করে খুঁজে বেছে নিন"
+                      hint="যে এলাকায় দরকার, তালিকা থেকে বেছে নিন।"
+                      value={areaId}
+                      onChange={(id) => {
+                        setListAreaMode();
+                        setAreaId(id);
+                        clearFieldError("areaId");
+                      }}
+                      error={fieldErrors.areaId}
+                      errorId={ERR_ID.areaId}
+                    />
+                  </>
+                ) : (
+                  <div>
+                    <label
+                      htmlFor={REQUEST_FIELD_IDS.customArea}
+                      className="block text-base font-semibold text-zinc-900"
+                    >
+                      আপনার এলাকার নাম <span className="text-red-600">*</span>
+                    </label>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      তালিকায় না থাকলে হল/মহল্লা/থানা লিখলেই চলবে।
+                    </p>
+                    <input
+                      id={REQUEST_FIELD_IDS.customArea}
+                      name="customArea"
+                      autoComplete="address-level2"
+                      aria-invalid={Boolean(fieldErrors.customArea)}
+                      aria-describedby={
+                        fieldErrors.customArea ? ERR_ID.customArea : undefined
+                      }
+                      value={customArea}
+                      onChange={(e) => {
+                        setCustomArea(e.target.value);
+                        clearFieldError("customArea");
+                      }}
+                      className={`${inputClass(Boolean(fieldErrors.customArea))} min-h-[52px]`}
+                      placeholder="যেমন: শ্যামপুর, রুপনগর…"
+                    />
+                    {fieldErrors.customArea ? (
+                      <p
+                        id={ERR_ID.customArea}
+                        className="mt-2 text-sm font-medium text-red-700"
+                        role="alert"
+                      >
+                        {fieldErrors.customArea}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </div>
 
               <div className="scroll-mt-24">
@@ -767,7 +926,7 @@ export function SimpleRequestForm({
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={loading || areasUnavailable}
+                disabled={loading || (areaMode === "list" && areasUnavailable)}
                 className="min-h-[56px] w-full touch-manipulation rounded-2xl bg-emerald-600 py-4 text-lg font-bold text-white shadow-md transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "পাঠানো হচ্ছে…" : "অনুরোধ জমা দিন"}

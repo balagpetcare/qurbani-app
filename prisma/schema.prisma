@@ -14,6 +14,21 @@ enum UserRole {
   ADMIN
   DOCTOR
   STAFF
+  /// Mobile app customer (OTP); never used for admin/doctor portal login.
+  CUSTOMER
+}
+
+/// Third-party identity linked to a mobile customer [User] row.
+enum SocialAuthProvider {
+  GOOGLE
+  FACEBOOK
+  APPLE
+}
+
+/// FCM/APNs device registration (mobile app only).
+enum PushDevicePlatform {
+  ANDROID
+  IOS
 }
 
 enum LeadStatus {
@@ -87,6 +102,16 @@ enum DoctorAreaPreferenceStatus {
   REJECTED
 }
 
+/// Geographic grouping for Dhaka / peri-urban service areas (admin + analytics).
+enum ServiceAreaZone {
+  NORTH_DHAKA
+  CENTRAL_DHAKA
+  OLD_DHAKA
+  SOUTH_DHAKA
+  WEST_DHAKA
+  OUTSIDE_DHAKA
+}
+
 /// How the customer paid (or owes); affects settlement rules.
 enum PaymentMethod {
   CASH
@@ -107,6 +132,44 @@ enum SettlementStatus {
   PAID_TO_DOCTOR
   DISPUTED
   CANCELLED
+}
+
+/// Doctor-authored tutorial lifecycle (admin gate before public).
+enum TutorialStatus {
+  DRAFT
+  PENDING_APPROVAL
+  PUBLISHED
+  REJECTED
+}
+
+/// Anonymized public case showcase; admin-gated like tutorials.
+enum PublicCaseHistoryStatus {
+  DRAFT
+  PENDING_APPROVAL
+  PUBLISHED
+  REJECTED
+}
+
+/// What is being reported to moderation.
+enum ModerationTargetType {
+  TUTORIAL
+  TUTORIAL_COMMENT
+  PUBLIC_CASE_HISTORY
+}
+
+enum ContentReportReason {
+  SPAM
+  HARASSMENT
+  MISINFORMATION
+  COPYRIGHT
+  OTHER
+}
+
+enum ContentReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED_DISMISSED
+  RESOLVED_ACTION_TAKEN
 }
 
 /// Snapshot of treatment closure semantics on the billing row (invoice/admin use).
@@ -152,16 +215,26 @@ model DoctorAreaPreferenceRequest {
 model Area {
   id        Int      @id @default(autoincrement())
   slug      String   @unique
+  /// Short English / romanized label (search, exports).
   name      String
+  /// Primary display name (Bengali).
   nameBn    String?
+  /// Optional English display name.
+  nameEn    String?
+  zone      ServiceAreaZone?
+  isPopular Boolean  @default(false)
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
+  note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   doctors       DoctorArea[]
   leads         Lead[]
   applications  DoctorApplicationArea[]
+
+  @@index([zone])
+  @@index([isActive, isPopular, sortOrder])
 }
 
 /// Doctors (User role DOCTOR) can cover multiple areas.
@@ -215,6 +288,47 @@ model User {
   reviewedDoctorApplications    DoctorApplication[]    @relation("DoctorApplicationReviewer")
   createdFromDoctorApplication  DoctorApplication?     @relation("DoctorApplicationConvertedUser")
   leadStatusHistoryAsActor      LeadStatusHistory[]
+  pushDeviceTokens              PushDeviceToken[]
+  tutorialsAuthored             Tutorial[]             @relation("TutorialAuthor")
+  tutorialsModerated          Tutorial[]             @relation("TutorialReviewedBy")
+  tutorialRevisionsCreated      TutorialRevision[]   @relation("TutorialRevisionAuthor")
+  contentReportsFiled           ContentReport[]        @relation("ContentReportReporter")
+  userBlocksCreated             UserBlock[]            @relation("UserBlocker")
+  userBlocksReceived            UserBlock[]            @relation("UserBlocked")
+  publicCaseHistoriesAuthored   PublicCaseHistory[]   @relation("PublicCaseHistoryAuthor")
+  publicCaseHistoriesModerated  PublicCaseHistory[]   @relation("PublicCaseHistoryReviewedBy")
+  /// When set, customer has completed OTP verification for [phone] (or legacy backfill).
+  phoneVerifiedAt             DateTime?
+  customerSocialLinks         CustomerSocialLink[]
+}
+
+/// Links a CUSTOMER user to a stable subject from Google / Facebook / Apple (no refresh tokens stored here).
+model CustomerSocialLink {
+  id              String             @id @default(cuid())
+  userId          Int
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider        SocialAuthProvider
+  /// IdP-stable subject (Google "sub", Facebook app-scoped user id, Apple "sub").
+  providerSubject String             @db.VarChar(255)
+  createdAt       DateTime           @default(now())
+
+  @@unique([provider, providerSubject])
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+/// One row per FCM registration token; [token] is globally unique (reassigned on login change).
+model PushDeviceToken {
+  id        String              @id @default(cuid())
+  userId    Int
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform  PushDevicePlatform
+  /// FCM registration token (never log in full in production).
+  token     String              @unique @db.Text
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([userId])
 }
 
 model DoctorApplication {
@@ -264,10 +378,11 @@ model Lead {
   customerName        String
   phone               String
   whatsapp            String?
-  /// Free-text area label from legacy submissions (optional).
+  /// Free-text area label (legacy, custom “অন্যান্য”, or denormalized snapshot).
   area                String?
-  areaId              Int
-  selectedArea        Area        @relation(fields: [areaId], references: [id])
+  /// When null, customer chose “অন্যান্য” and `area` holds the custom label.
+  areaId              Int?
+  selectedArea        Area?       @relation(fields: [areaId], references: [id])
   address             String?
   /// Legacy free-text animal label; when `animalKind` is OTHER, use for detail.
   animalType          String?
@@ -315,8 +430,24 @@ model Lead {
   caseReport          LeadCaseReport?
   caseBilling         LeadCaseBilling?
   statusHistory       LeadStatusHistory[]
+  publicCaseHistory   PublicCaseHistory?
 
   @@index([priority])
+  @@index([phone, createdAt])
+}
+
+/// One-time password challenge for mobile customer login. Plain OTP is never stored.
+model CustomerOtpChallenge {
+  id           String    @id @default(cuid())
+  /// Canonical Bangladesh mobile `01[3-9]XXXXXXXX` (matches [Lead.phone] after intake).
+  phoneCanon   String
+  codeHash     String
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([phoneCanon, createdAt])
 }
 
 /// Doctor-entered treatment record; draft until completedAt is set.
@@ -341,6 +472,7 @@ model LeadCaseReport {
   completedBy            User?     @relation("LeadCaseReportDoctor", fields: [completedByDoctorId], references: [id])
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+  publicCaseHistoryAsSource PublicCaseHistory? @relation("PublicCaseHistorySourceCaseReport")
 }
 
 /// Snapshot when a case is closed with billing: amounts, commission, settlement, invoice id.
@@ -464,4 +596,126 @@ model LeadNote {
   note      String
   createdBy String?
   createdAt DateTime @default(now())
+}
+
+/// Canonical tutorial row; public APIs only when status is PUBLISHED.
+model Tutorial {
+  id                  Int            @id @default(autoincrement())
+  authorUserId        Int
+  author              User           @relation("TutorialAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+  status              TutorialStatus @default(DRAFT)
+  /// Active content pointer (draft edits or revision pending / published face).
+  currentRevisionId   Int?           @unique
+  currentRevision     TutorialRevision? @relation("TutorialCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  submittedAt         DateTime?
+  publishedAt         DateTime?
+  rejectedAt          DateTime?
+  rejectionReason     String?        @db.Text
+  reviewedByUserId    Int?
+  reviewedBy          User?          @relation("TutorialReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  likeCount           Int            @default(0)
+  commentCount        Int            @default(0)
+  shareCount          Int            @default(0)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  revisions           TutorialRevision[] @relation("TutorialRevisionList")
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([authorUserId, status])
+}
+
+model TutorialRevision {
+  id               Int      @id @default(autoincrement())
+  tutorialId       Int
+  tutorial         Tutorial @relation("TutorialRevisionList", fields: [tutorialId], references: [id], onDelete: Cascade)
+  revisionNumber   Int
+  titleBn          String
+  summaryBn        String?  @db.Text
+  bodyBn           String?  @db.Text
+  videoUrl         String
+  posterImageUrl   String?
+  durationSec      Int?
+  mimeType         String?
+  byteSize         Int?
+  createdByUserId  Int?
+  createdBy        User?    @relation("TutorialRevisionAuthor", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tutorialAsCurrent Tutorial? @relation("TutorialCurrentRevision")
+
+  @@unique([tutorialId, revisionNumber])
+  @@index([tutorialId])
+}
+
+model ContentReport {
+  id                  Int                   @id @default(autoincrement())
+  reporterUserId      Int
+  reporter            User                  @relation("ContentReportReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  targetType          ModerationTargetType
+  targetId            Int
+  reason              ContentReportReason
+  details             String?               @db.Text
+  status              ContentReportStatus   @default(OPEN)
+  assignedAdminUserId Int?
+  resolutionNote      String?               @db.Text
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([targetType, targetId])
+  @@index([reporterUserId, createdAt])
+  @@index([status])
+}
+
+model UserBlock {
+  id            Int      @id @default(autoincrement())
+  blockerUserId Int
+  blockedUserId Int
+  blocker       User     @relation("UserBlocker", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blocked       User     @relation("UserBlocked", fields: [blockedUserId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([blockerUserId, blockedUserId])
+  @@index([blockerUserId])
+  @@index([blockedUserId])
+}
+
+/// Anonymized case showcase; never stores customer PII. One row per source lead.
+model PublicCaseHistory {
+  id                   Int                       @id @default(autoincrement())
+  sourceLeadId         Int                       @unique
+  lead                 Lead                      @relation(fields: [sourceLeadId], references: [id], onDelete: Cascade)
+  sourceCaseReportId   Int?                      @unique
+  sourceCaseReport     LeadCaseReport?           @relation("PublicCaseHistorySourceCaseReport", fields: [sourceCaseReportId], references: [id], onDelete: SetNull)
+  authorDoctorUserId   Int
+  authorDoctor         User                      @relation("PublicCaseHistoryAuthor", fields: [authorDoctorUserId], references: [id], onDelete: Cascade)
+  status               PublicCaseHistoryStatus   @default(DRAFT)
+  titleBn              String
+  summaryBn            String?                   @db.Text
+  bodyBn               String?                   @db.Text
+  animalKind           AnimalKind?
+  /// Short label when animalKind is OTHER (doctor-edited; validated for PII patterns).
+  animalTypeLabelBn    String?
+  problemSummaryBn     String                    @db.Text
+  diagnosisSummaryBn   String?                   @db.Text
+  treatmentSummaryBn   String?                   @db.Text
+  resultSummaryBn      String?                   @db.Text
+  /// Coarse public area label (zone/region BN); never full street address.
+  areaBucket           String
+  /// JSON array of approved https media URLs (MVP: doctor-submitted, admin-approved on publish).
+  mediaUrls            String?                   @db.Text
+  posterImageUrl       String?
+  submittedAt          DateTime?
+  publishedAt          DateTime?
+  rejectedAt           DateTime?
+  rejectionReason      String?                   @db.Text
+  reviewedByUserId     Int?
+  reviewedBy           User?                     @relation("PublicCaseHistoryReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  likeCount            Int                       @default(0)
+  commentCount         Int                       @default(0)
+  shareCount           Int                       @default(0)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([authorDoctorUserId, status])
 }

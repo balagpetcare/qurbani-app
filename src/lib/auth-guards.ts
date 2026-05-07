@@ -1,27 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { UserRole } from "@/generated/prisma/enums";
-import { AUTH_COOKIE_NAME, verifyAuthToken } from "@/lib/auth-token";
+import { verifyAuthFromRequest } from "@/lib/auth-token";
 import { prisma } from "@/lib/prisma";
 
-export async function getAuthFromCookies(
-  cookieHeader: string | null,
-): Promise<import("@/lib/auth-token").AuthTokenPayload | null> {
-  if (!cookieHeader) return null;
-  const m = cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`));
-  const raw = m?.[1];
-  if (!raw) return null;
-  let value = raw;
-  try {
-    value = decodeURIComponent(raw);
-  } catch {
-    value = raw;
-  }
-  return verifyAuthToken(value);
-}
-
 export async function requireAdminFromRequest(request: Request) {
-  const payload = await getAuthFromCookies(request.headers.get("cookie"));
+  const payload = await verifyAuthFromRequest(request);
   if (!payload || (payload.role !== "ADMIN" && payload.role !== "STAFF")) {
     return { ok: false as const, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
@@ -57,7 +41,7 @@ export async function requireMainAdminFromRequest(request: Request) {
 }
 
 export async function requireDoctorFromRequest(request: Request) {
-  const payload = await getAuthFromCookies(request.headers.get("cookie"));
+  const payload = await verifyAuthFromRequest(request);
   if (!payload || payload.role !== "DOCTOR") {
     return { ok: false as const, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }

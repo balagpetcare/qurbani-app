@@ -8,6 +8,10 @@ import { AdminMain } from "@/components/admin/ui/AdminMain";
 import { UserRole } from "@/generated/prisma/enums";
 import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import {
+  publicCustomerAreaOrderBy,
+  publicCustomerAreaWhere,
+} from "@/lib/public-areas";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +51,9 @@ export default async function EditDoctorPage({ params }: PageProps) {
       },
     }),
     prisma.area.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, nameBn: true },
+      where: publicCustomerAreaWhere,
+      orderBy: publicCustomerAreaOrderBy,
+      select: { id: true, name: true, nameBn: true, nameEn: true },
     }),
   ]);
 

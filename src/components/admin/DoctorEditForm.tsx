@@ -6,7 +6,7 @@ import { FormEvent, useState } from "react";
 import { SearchableAreaMultiSelect } from "@/components/forms/SearchableAreaMultiSelect";
 import { DOCTOR_AVAILABILITY_OPTIONS } from "@/lib/admin-form-labels";
 
-type AreaOpt = { id: number; name: string; nameBn: string | null };
+type AreaOpt = { id: number; name: string; nameBn: string | null; nameEn?: string | null };
 
 type Props = {
   doctorId: number;

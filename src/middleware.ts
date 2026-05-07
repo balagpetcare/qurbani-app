@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { AUTH_COOKIE_NAME, verifyAuthToken } from "@/lib/auth-token";
+import { verifyAuthFromRequest } from "@/lib/auth-token";
 
 const ADMIN_LOGIN = "/admin/login";
 const DOCTOR_LOGIN = "/doctor/login";
@@ -24,8 +24,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  const payload = await verifyAuthToken(token);
+  const payload = await verifyAuthFromRequest(request);
 
   if (pathname.startsWith("/admin")) {
     if (pathname === ADMIN_LOGIN) {

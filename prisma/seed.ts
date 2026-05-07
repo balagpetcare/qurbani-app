@@ -8,6 +8,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type Prisma } from "../src/generated/prisma/client";
 import { UserRole } from "../src/generated/prisma/enums";
 import { normalizeBangladeshPhone } from "../src/lib/phone";
+import { AREA_SEED_ROWS } from "../src/lib/area-seed-data";
 import { SITE_SETTING_SEED_ROWS } from "../src/lib/site-setting-registry";
 
 const connectionString = process.env.DATABASE_URL;
@@ -61,63 +62,49 @@ async function main() {
     },
   });
 
-  const areaRows = [
-    {
+  await prisma.area.upsert({
+    where: { slug: "onnanno" },
+    create: {
       slug: "onnanno",
-      name: "অন্যান্য / Other",
-      nameBn: "অন্যান্য",
-      sortOrder: 0,
+      name: "Legacy other",
+      nameBn: "অন্যান্য (পুরনো)",
+      sortOrder: 9999,
+      isActive: false,
     },
-    { slug: "mirpur", name: "Mirpur", nameBn: "মিরপুর", sortOrder: 10 },
-    { slug: "uttara", name: "Uttara", nameBn: "উত্তরা", sortOrder: 20 },
-    { slug: "rampura", name: "Rampura", nameBn: "রামপুরা", sortOrder: 30 },
-    { slug: "badda", name: "Badda", nameBn: "বাড্ডা", sortOrder: 40 },
-    { slug: "gulshan", name: "Gulshan", nameBn: "গুলশান", sortOrder: 50 },
-    { slug: "banani", name: "Banani", nameBn: "বনানী", sortOrder: 60 },
-    {
-      slug: "mohammadpur",
-      name: "Mohammadpur",
-      nameBn: "মোহাম্মদপুর",
-      sortOrder: 70,
+    update: {
+      isActive: false,
     },
-    {
-      slug: "jatrabari",
-      name: "Jatrabari",
-      nameBn: "যাত্রাবাড়ী",
-      sortOrder: 80,
-    },
-    {
-      slug: "keraniganj",
-      name: "Keraniganj",
-      nameBn: "কেরানীগঞ্জ",
-      sortOrder: 90,
-    },
-    {
-      slug: "savar-nearby",
-      name: "Savar & nearby",
-      nameBn: "সাভার ও আশেপাশে",
-      sortOrder: 100,
-    },
-  ];
+  });
 
-  for (const a of areaRows) {
+  for (const a of AREA_SEED_ROWS) {
     await prisma.area.upsert({
       where: { slug: a.slug },
       create: {
         slug: a.slug,
         name: a.name,
         nameBn: a.nameBn,
+        nameEn: a.nameEn ?? null,
+        zone: a.zone,
+        isPopular: a.isPopular,
         sortOrder: a.sortOrder,
-        isActive: true,
+        isActive: a.isActive ?? true,
       },
       update: {
         name: a.name,
         nameBn: a.nameBn,
+        nameEn: a.nameEn ?? null,
+        zone: a.zone,
+        isPopular: a.isPopular,
         sortOrder: a.sortOrder,
-        isActive: true,
+        isActive: a.isActive ?? true,
       },
     });
   }
+
+  await prisma.area.updateMany({
+    where: { slug: "savar-nearby" },
+    data: { isActive: false },
+  });
 
   for (const row of SITE_SETTING_SEED_ROWS) {
     await prisma.siteSetting.upsert({
@@ -140,7 +127,7 @@ async function main() {
   }
 
   console.log(
-    `Seed OK: Main Admin id=${admin.id} email=${admin.email} (login with this email/phone + ADMIN_SEED_PASSWORD). Areas upserted: ${areaRows.length}. Site settings upserted: ${SITE_SETTING_SEED_ROWS.length}.`,
+    `Seed OK: Main Admin id=${admin.id} email=${admin.email} (login with this email/phone + ADMIN_SEED_PASSWORD). Areas upserted: ${AREA_SEED_ROWS.length}. Site settings upserted: ${SITE_SETTING_SEED_ROWS.length}.`,
   );
 }
 

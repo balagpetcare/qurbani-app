@@ -1,5 +1,5 @@
 import { AdminNav } from "@/components/admin/AdminNav";
-import { AreaAdminRow } from "@/components/admin/AreaAdminRow";
+import { AreasAdminPanel } from "@/components/admin/AreasAdminPanel";
 import { AdminAppShell } from "@/components/admin/ui/AdminAppShell";
 import { AdminEmptyState } from "@/components/admin/ui/AdminEmptyState";
 import { AdminMain } from "@/components/admin/ui/AdminMain";
@@ -10,14 +10,18 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminAreasPage() {
   const areas = await prisma.area.findMany({
-    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    orderBy: [{ zone: "asc" }, { sortOrder: "asc" }, { id: "asc" }],
     select: {
       id: true,
       slug: true,
       name: true,
       nameBn: true,
+      nameEn: true,
+      zone: true,
+      isPopular: true,
       sortOrder: true,
       isActive: true,
+      note: true,
       _count: {
         select: {
           doctors: true,
@@ -39,12 +43,12 @@ export default async function AdminAreasPage() {
 
   return (
     <AdminAppShell>
-      <AdminNav title="এলাকা ব্যবস্থাপনা" subtitle="সেড করা এলাকা ও ব্যবহার পরিসংখ্যান" />
+      <AdminNav title="এলাকা ব্যবস্থাপনা" subtitle="সেবার এলাকা — তালিকা, জোন ও ব্যবহার" />
 
       <AdminMain variant="narrow" className="space-y-4">
         <p className="text-sm leading-relaxed text-q-muted">
-          পাবলিক ফর্ম ও ডাক্তার এলাকা নির্বাচন এই তালিকা থেকে আসে। নিষ্ক্রিয় এলাকা নতুন
-          লিডে দেখাবে না।
+          পাবলিক ফর্ম ও ডাক্তার এলাকা নির্বাচন সক্রিয় এলাকা থেকে আসে। নিষ্ক্রিয় এলাকা নতুন
+          লিডে দেখাবে না। “অন্যান্য” লিড এখন টেক্সট হিসেবে সংরক্ষিত হয়।
         </p>
 
         {areas.length === 0 ? (
@@ -53,13 +57,7 @@ export default async function AdminAreasPage() {
             description="ডাটাবেস সিড চালান বা মাইগ্রেশন যাচাই করুন।"
           />
         ) : (
-          <ul className="space-y-3">
-            {areas.map((a) => (
-              <li key={a.id}>
-                <AreaAdminRow area={a} />
-              </li>
-            ))}
-          </ul>
+          <AreasAdminPanel initialAreas={areas} />
         )}
       </AdminMain>
     </AdminAppShell>

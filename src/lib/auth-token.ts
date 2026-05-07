@@ -5,7 +5,7 @@ const PREFIX = "v1.";
 
 export const AUTH_COOKIE_NAME = "qurbani_auth";
 
-export type AuthRole = "ADMIN" | "STAFF" | "DOCTOR";
+export type AuthRole = "ADMIN" | "STAFF" | "DOCTOR" | "CUSTOMER";
 
 export type AuthTokenPayload = {
   sub: number;
@@ -90,6 +90,39 @@ export async function signAuthToken(
   return `${PREFIX}${payloadB64}.${sig}`;
 }
 
+/**
+ * Verify auth from `Authorization: Bearer <token>` first, then `qurbani_auth` cookie.
+ * Edge-safe (no DB) — use in middleware and route handlers before role checks.
+ */
+export async function verifyAuthFromRequest(
+  request: Request,
+): Promise<AuthTokenPayload | null> {
+  const authz = request.headers.get("authorization");
+  if (authz) {
+    const m = /^\s*Bearer\s+(\S+)/i.exec(authz);
+    const bearerToken = m?.[1]?.trim();
+    if (bearerToken) {
+      const fromBearer = await verifyAuthToken(bearerToken);
+      if (fromBearer) return fromBearer;
+    }
+  }
+
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) return null;
+  const cookieMatch = cookieHeader.match(
+    new RegExp(`(?:^|;\\s*)${AUTH_COOKIE_NAME}=([^;]+)`),
+  );
+  const raw = cookieMatch?.[1];
+  if (!raw) return null;
+  let value = raw;
+  try {
+    value = decodeURIComponent(raw);
+  } catch {
+    value = raw;
+  }
+  return verifyAuthToken(value);
+}
+
 export async function verifyAuthToken(
   token: string | undefined,
 ): Promise<AuthTokenPayload | null> {
@@ -119,7 +152,8 @@ export async function verifyAuthToken(
     typeof parsed.sub !== "number" ||
     (parsed.role !== "ADMIN" &&
       parsed.role !== "STAFF" &&
-      parsed.role !== "DOCTOR") ||
+      parsed.role !== "DOCTOR" &&
+      parsed.role !== "CUSTOMER") ||
     typeof parsed.exp !== "number"
   ) {
     return null;

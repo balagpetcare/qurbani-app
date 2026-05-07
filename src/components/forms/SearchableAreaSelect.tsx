@@ -6,6 +6,7 @@ export type AreaOption = {
   id: number;
   name: string;
   nameBn: string | null;
+  nameEn?: string | null;
 };
 
 type Props = {
@@ -56,9 +57,11 @@ export function SearchableAreaSelect({
   );
 
   const displayLabel = selectedArea
-    ? selectedArea.nameBn
-      ? `${selectedArea.name} (${selectedArea.nameBn})`
-      : selectedArea.name
+    ? selectedArea.nameBn?.trim()
+      ? selectedArea.nameBn
+      : selectedArea.nameEn?.trim()
+        ? selectedArea.nameEn
+        : selectedArea.name
     : "";
 
   const filtered = useMemo(() => {
@@ -66,8 +69,14 @@ export function SearchableAreaSelect({
     if (!q) return areas;
     return areas.filter((a) => {
       const en = a.name.toLowerCase();
+      const en2 = (a.nameEn ?? "").toLowerCase();
       const bn = (a.nameBn ?? "").toLowerCase();
-      return en.includes(q) || bn.includes(q) || String(a.id) === q;
+      return (
+        en.includes(q) ||
+        en2.includes(q) ||
+        bn.includes(q) ||
+        String(a.id) === q
+      );
     });
   }, [areas, query]);
 
@@ -75,7 +84,15 @@ export function SearchableAreaSelect({
     if (onChange) onChange(id);
     else setInternalId(id);
     const a = areas.find((x) => x.id === id);
-    setQuery(a ? (a.nameBn ? `${a.name} (${a.nameBn})` : a.name) : "");
+    setQuery(
+      a
+        ? a.nameBn?.trim()
+          ? a.nameBn
+          : a.nameEn?.trim()
+            ? a.nameEn
+            : a.name
+        : "",
+    );
     setOpen(false);
   }
 
@@ -168,7 +185,11 @@ export function SearchableAreaSelect({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => pick(a.id)}
                     >
-                      {a.nameBn ? `${a.name} (${a.nameBn})` : a.name}
+                      {a.nameBn?.trim()
+                        ? a.nameBn
+                        : a.nameEn?.trim()
+                          ? a.nameEn
+                          : a.name}
                     </button>
                   </li>
                 ))

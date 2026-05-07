@@ -29,6 +29,8 @@ type LeadBody = {
   phone?: unknown;
   whatsapp?: unknown;
   areaId?: unknown;
+  /** Free-text when customer picks “অন্যান্য”. */
+  customArea?: unknown;
   address?: unknown;
   animalType?: unknown;
   animalTypeOther?: unknown;
@@ -104,12 +106,17 @@ export async function POST(request: Request) {
     : "";
 
   let areaId: number | undefined;
-  if (typeof body.areaId === "number" && Number.isInteger(body.areaId)) {
-    areaId = body.areaId;
-  } else if (typeof body.areaId === "string") {
-    const n = parseInt(body.areaId.trim(), 10);
-    if (!Number.isNaN(n) && n > 0) areaId = n;
+  if (body.areaId !== undefined && body.areaId !== null && body.areaId !== "") {
+    if (typeof body.areaId === "number" && Number.isInteger(body.areaId)) {
+      areaId = body.areaId;
+    } else if (typeof body.areaId === "string" && body.areaId.trim() !== "") {
+      const n = parseInt(body.areaId.trim(), 10);
+      if (!Number.isNaN(n) && n > 0) areaId = n;
+    }
   }
+
+  const customAreaRaw = asTrimmedString(body.customArea);
+  const customArea = customAreaRaw ? clamp(customAreaRaw, 200) : "";
 
   if (!customerName || !phoneRaw) {
     return NextResponse.json(
@@ -121,11 +128,36 @@ export async function POST(request: Request) {
     );
   }
 
-  if (areaId === undefined) {
+  const areaSelectionMissing = areaId === undefined && !customArea;
+  const bothProvided = areaId !== undefined && Boolean(customArea);
+
+  if (areaSelectionMissing) {
     return NextResponse.json(
       {
-        error: "areaId is required",
-        messageBn: "সেবার এলাকা বেছে নিন।",
+        error: "AREA_SELECTION_REQUIRED",
+        messageBn: "অনুগ্রহ করে আপনার এলাকা নির্বাচন করুন।",
+      },
+      { status: 400 },
+    );
+  }
+
+  if (bothProvided) {
+    return NextResponse.json(
+      {
+        error: "AREA_AMBIGUOUS",
+        messageBn:
+          "এলাকা তালিকা থেকে বেছে নিন, অথবা শুধু ‘অন্যান্য’ অপশনে এলাকার নাম লিখুন।",
+      },
+      { status: 400 },
+    );
+  }
+
+  if (areaId === undefined && customArea.length < 2) {
+    return NextResponse.json(
+      {
+        error: "CUSTOM_AREA_REQUIRED",
+        messageBn:
+          "আপনার এলাকা তালিকায় না থাকলে ‘অন্যান্য’ নির্বাচন করে এলাকার নাম লিখুন।",
       },
       { status: 400 },
     );
@@ -188,19 +220,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const areaExists = await prisma.area.findFirst({
-    where: { id: areaId, isActive: true },
-    select: { id: true },
-  });
-  if (!areaExists) {
-    return NextResponse.json(
-      {
-        error: "Invalid or inactive areaId",
-        messageBn:
-          "এই এলাকাটি এখন নির্বাচন করা যাচ্ছে না। অন্য এলাকা বেছে নিন।",
-      },
-      { status: 400 },
-    );
+  if (areaId !== undefined) {
+    const areaExists = await prisma.area.findFirst({
+      where: { id: areaId, isActive: true },
+      select: { id: true, slug: true },
+    });
+    if (!areaExists) {
+      return NextResponse.json(
+        {
+          error: "Invalid or inactive areaId",
+          messageBn:
+            "এই এলাকাটি এখন নির্বাচন করা যাচ্ছে না। অন্য এলাকা বেছে নিন।",
+        },
+        { status: 400 },
+      );
+    }
   }
 
   const whatsappRaw = asTrimmedString(body.whatsapp);
@@ -260,10 +294,18 @@ export async function POST(request: Request) {
       select: { id: true },
     });
 
-    const selectedArea = await prisma.area.findUnique({
-      where: { id: areaId },
-      select: { name: true },
-    });
+    const selectedArea =
+      areaId !== undefined
+        ? await prisma.area.findUnique({
+            where: { id: areaId },
+            select: { name: true, nameBn: true },
+          })
+        : null;
+    const areaSnapshot =
+      areaId !== undefined
+        ? (selectedArea?.nameBn?.trim() || selectedArea?.name || "").trim() ||
+          undefined
+        : customArea;
 
     const lead = await prisma.lead.create({
       data: {
@@ -272,8 +314,8 @@ export async function POST(request: Request) {
         whatsapp: whatsappNormalized,
         isPossibleDuplicate: !!priorDuplicate,
         duplicateOfLeadId: priorDuplicate?.id,
-        areaId,
-        area: selectedArea?.name ?? undefined,
+        areaId: areaId ?? null,
+        area: areaSnapshot,
         address,
         animalKind,
         animalType: animalTypeForDb,
@@ -335,7 +377,7 @@ export async function POST(request: Request) {
     logOps("lead_submitted", {
       leadId: lead.id,
       priority: lead.priority,
-      areaId,
+      areaId: areaId ?? null,
       possibleDuplicate: priorDuplicate ? true : false,
       phoneMasked: maskPhoneForLog(phone),
       emergency: lead.priority === LeadPriority.EMERGENCY,
