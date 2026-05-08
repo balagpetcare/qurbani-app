@@ -7,6 +7,7 @@ import {
   authCookieOptions,
   signAuthToken,
 } from "@/lib/auth-token";
+import { mobileApiErrorBody } from "@/lib/api-json-response";
 import {
   OTP_CHALLENGE_EXPIRED_BN,
   OTP_CHALLENGE_NOT_FOUND_BN,
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     body = (await request.json()) as Body;
   } catch {
     return NextResponse.json(
-      { error: "Invalid JSON", messageBn: OTP_GENERIC_ERROR_BN },
+      mobileApiErrorBody("INVALID_JSON", OTP_GENERIC_ERROR_BN, "Invalid JSON"),
       { status: 400 },
     );
   }
@@ -58,10 +59,9 @@ export async function POST(request: Request) {
   const phoneRaw = typeof body.phone === "string" ? body.phone.trim() : "";
   const phoneCanon = normalizeBangladeshPhone(phoneRaw);
   if (!phoneCanon) {
-    return NextResponse.json(
-      { error: "INVALID_PHONE", messageBn: OTP_PHONE_INVALID_BN },
-      { status: 400 },
-    );
+    return NextResponse.json(mobileApiErrorBody("INVALID_PHONE", OTP_PHONE_INVALID_BN), {
+      status: 400,
+    });
   }
 
   const challengeId =
@@ -69,15 +69,14 @@ export async function POST(request: Request) {
   const codeRaw = typeof body.code === "string" ? body.code.trim() : "";
   if (!challengeId) {
     return NextResponse.json(
-      { error: "CHALLENGE_REQUIRED", messageBn: OTP_CHALLENGE_NOT_FOUND_BN },
+      mobileApiErrorBody("CHALLENGE_REQUIRED", OTP_CHALLENGE_NOT_FOUND_BN),
       { status: 400 },
     );
   }
   if (!OTP_CODE_RE.test(codeRaw)) {
-    return NextResponse.json(
-      { error: "INVALID_CODE", messageBn: OTP_CODE_FORMAT_BN },
-      { status: 400 },
-    );
+    return NextResponse.json(mobileApiErrorBody("INVALID_CODE", OTP_CODE_FORMAT_BN), {
+      status: 400,
+    });
   }
 
   const rl = assertMobileOtpVerifyAllowed(request, phoneCanon);
@@ -91,14 +90,14 @@ export async function POST(request: Request) {
       /* ignore */
     }
     return NextResponse.json(
-      { error: "RATE_LIMIT", messageBn },
+      mobileApiErrorBody("RATE_LIMIT", messageBn, "Rate limited"),
       { status: 429 },
     );
   }
 
   if (await phoneBlockedForCustomerOtp(phoneCanon)) {
     return NextResponse.json(
-      { error: "PHONE_NOT_ELIGIBLE", messageBn: OTP_PHONE_NOT_ELIGIBLE_BN },
+      mobileApiErrorBody("PHONE_NOT_ELIGIBLE", OTP_PHONE_NOT_ELIGIBLE_BN),
       { status: 403 },
     );
   }
@@ -109,28 +108,27 @@ export async function POST(request: Request) {
 
   if (!challenge) {
     return NextResponse.json(
-      { error: "CHALLENGE_NOT_FOUND", messageBn: OTP_CHALLENGE_NOT_FOUND_BN },
+      mobileApiErrorBody("CHALLENGE_NOT_FOUND", OTP_CHALLENGE_NOT_FOUND_BN),
       { status: 400 },
     );
   }
 
   if (challenge.consumedAt) {
-    return NextResponse.json(
-      { error: "CHALLENGE_USED", messageBn: OTP_CHALLENGE_USED_BN },
-      { status: 400 },
-    );
+    return NextResponse.json(mobileApiErrorBody("CHALLENGE_USED", OTP_CHALLENGE_USED_BN), {
+      status: 400,
+    });
   }
 
   if (challenge.expiresAt.getTime() < Date.now()) {
     return NextResponse.json(
-      { error: "CHALLENGE_EXPIRED", messageBn: OTP_CHALLENGE_EXPIRED_BN },
+      mobileApiErrorBody("CHALLENGE_EXPIRED", OTP_CHALLENGE_EXPIRED_BN),
       { status: 400 },
     );
   }
 
   if (challenge.attemptCount >= MAX_OTP_ATTEMPTS) {
     return NextResponse.json(
-      { error: "TOO_MANY_ATTEMPTS", messageBn: OTP_TOO_MANY_ATTEMPTS_BN },
+      mobileApiErrorBody("TOO_MANY_ATTEMPTS", OTP_TOO_MANY_ATTEMPTS_BN),
       { status: 400 },
     );
   }
@@ -148,14 +146,13 @@ export async function POST(request: Request) {
     });
     if (updated && updated.attemptCount >= MAX_OTP_ATTEMPTS) {
       return NextResponse.json(
-        { error: "TOO_MANY_ATTEMPTS", messageBn: OTP_TOO_MANY_ATTEMPTS_BN },
+        mobileApiErrorBody("TOO_MANY_ATTEMPTS", OTP_TOO_MANY_ATTEMPTS_BN),
         { status: 400 },
       );
     }
-    return NextResponse.json(
-      { error: "WRONG_CODE", messageBn: OTP_WRONG_CODE_BN },
-      { status: 400 },
-    );
+    return NextResponse.json(mobileApiErrorBody("WRONG_CODE", OTP_WRONG_CODE_BN), {
+      status: 400,
+    });
   }
 
   let userId: number;
@@ -197,15 +194,14 @@ export async function POST(request: Request) {
   } catch (e) {
     if (e instanceof Error && e.message === "non_customer_phone") {
       return NextResponse.json(
-        { error: "PHONE_NOT_ELIGIBLE", messageBn: OTP_PHONE_NOT_ELIGIBLE_BN },
+        mobileApiErrorBody("PHONE_NOT_ELIGIBLE", OTP_PHONE_NOT_ELIGIBLE_BN),
         { status: 403 },
       );
     }
     console.error("POST /api/mobile/otp/verify transaction", e);
-    return NextResponse.json(
-      { error: "SERVER_ERROR", messageBn: OTP_GENERIC_ERROR_BN },
-      { status: 500 },
-    );
+    return NextResponse.json(mobileApiErrorBody("SERVER_ERROR", OTP_GENERIC_ERROR_BN), {
+      status: 500,
+    });
   }
 
   try {
@@ -213,11 +209,27 @@ export async function POST(request: Request) {
       { userId, role: "CUSTOMER" },
       SESSION_MAX_AGE_SEC,
     );
+
+    const customer = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, phone: true, email: true, role: true },
+    });
+
     const res = NextResponse.json({
+      ok: true,
       success: true,
       accessToken: token,
       tokenType: "Bearer",
       expiresInSec: SESSION_MAX_AGE_SEC,
+      customer: customer
+        ? {
+            id: customer.id,
+            name: customer.name,
+            phone: customer.phone,
+            email: customer.email,
+            role: customer.role,
+          }
+        : null,
     });
     res.cookies.set(
       AUTH_COOKIE_NAME,
@@ -227,9 +239,8 @@ export async function POST(request: Request) {
     return res;
   } catch (err) {
     console.error("POST /api/mobile/otp/verify sign", err);
-    return NextResponse.json(
-      { error: "SERVER_ERROR", messageBn: OTP_GENERIC_ERROR_BN },
-      { status: 503 },
-    );
+    return NextResponse.json(mobileApiErrorBody("SERVER_ERROR", OTP_GENERIC_ERROR_BN), {
+      status: 503,
+    });
   }
 }

@@ -7,9 +7,9 @@ import {
   SOCIAL_EMAIL_REQUIRED_BN,
   SOCIAL_GENERIC_ERROR_BN,
   SOCIAL_INVALID_TOKEN_BN,
+  SOCIAL_NOT_CONFIGURED_BN,
   SOCIAL_PHONE_NOT_VERIFIED_BN,
   SOCIAL_PROVIDER_ALREADY_LINKED_BN,
-  SOCIAL_PROVIDER_DISABLED_BN,
   SOCIAL_PROVIDER_TYPE_CONFLICT_BN,
 } from "@/lib/mobile-social-auth-messages";
 import type { VerifiedSocialProfile } from "@/lib/social-oidc-verify";
@@ -73,7 +73,7 @@ export async function exchangeCustomerSocialLogin(params: {
   const { provider, idToken, accessToken } = params;
 
   if (!isProviderConfigured(provider)) {
-    return err(503, "PROVIDER_DISABLED", SOCIAL_PROVIDER_DISABLED_BN);
+    return err(501, "NOT_CONFIGURED", SOCIAL_NOT_CONFIGURED_BN);
   }
 
   let profile: VerifiedSocialProfile | null;

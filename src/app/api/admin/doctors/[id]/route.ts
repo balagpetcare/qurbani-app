@@ -263,7 +263,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const newPass =
     typeof body.password === "string" ? body.password : undefined;
-  if (newPass !== undefined) {
+  if (newPass !== undefined && newPass.length > 0) {
     if (newPass.length < 8) {
       return NextResponse.json(
         { error: "password must be at least 8 characters" },

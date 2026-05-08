@@ -5,6 +5,9 @@ export const SOCIAL_GENERIC_ERROR_BN =
 
 export const SOCIAL_INVALID_BODY_BN = "অনুরোধের বিন্যাস সঠিক নয়।";
 
+export const SOCIAL_NOT_CONFIGURED_BN =
+  "এই লগইন পদ্ধতি এখনো কনফিগার করা হয়নি।";
+
 export const SOCIAL_PROVIDER_DISABLED_BN =
   "এই প্রদানকারী সার্ভারে চালু করা নেই। অ্যাডমিন কনফিগারেশন দেখুন।";
 

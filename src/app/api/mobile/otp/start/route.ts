@@ -3,6 +3,7 @@ import { randomInt } from "crypto";
 import { NextResponse } from "next/server";
 
 import { UserRole } from "@/generated/prisma/enums";
+import { mobileApiErrorBody } from "@/lib/api-json-response";
 import { sendCustomerOtpSmsIfConfigured } from "@/lib/customer-otp-sms";
 import {
   OTP_GENERIC_ERROR_BN,
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     body = (await request.json()) as Body;
   } catch {
     return NextResponse.json(
-      { error: "Invalid JSON", messageBn: OTP_GENERIC_ERROR_BN },
+      mobileApiErrorBody("INVALID_JSON", OTP_GENERIC_ERROR_BN, "Invalid JSON"),
       { status: 400 },
     );
   }
@@ -54,10 +55,9 @@ export async function POST(request: Request) {
   const phoneRaw = typeof body.phone === "string" ? body.phone.trim() : "";
   const phoneCanon = normalizeBangladeshPhone(phoneRaw);
   if (!phoneCanon) {
-    return NextResponse.json(
-      { error: "INVALID_PHONE", messageBn: OTP_PHONE_INVALID_BN },
-      { status: 400 },
-    );
+    return NextResponse.json(mobileApiErrorBody("INVALID_PHONE", OTP_PHONE_INVALID_BN), {
+      status: 400,
+    });
   }
 
   const rl = assertMobileOtpStartAllowed(request, phoneCanon);
@@ -71,14 +71,14 @@ export async function POST(request: Request) {
       /* ignore */
     }
     return NextResponse.json(
-      { error: "RATE_LIMIT", messageBn },
+      mobileApiErrorBody("RATE_LIMIT", messageBn, "Rate limited"),
       { status: 429 },
     );
   }
 
   if (await phoneBlockedForCustomerOtp(phoneCanon)) {
     return NextResponse.json(
-      { error: "PHONE_NOT_ELIGIBLE", messageBn: OTP_PHONE_NOT_ELIGIBLE_BN },
+      mobileApiErrorBody("PHONE_NOT_ELIGIBLE", OTP_PHONE_NOT_ELIGIBLE_BN),
       { status: 403 },
     );
   }
@@ -99,10 +99,9 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     console.error("POST /api/mobile/otp/start", e);
-    return NextResponse.json(
-      { error: "SERVER_ERROR", messageBn: OTP_GENERIC_ERROR_BN },
-      { status: 500 },
-    );
+    return NextResponse.json(mobileApiErrorBody("SERVER_ERROR", OTP_GENERIC_ERROR_BN), {
+      status: 500,
+    });
   }
 
   let smsReason: "disabled" | "missing_env" | "ok" | "http_error" = "disabled";
@@ -121,6 +120,7 @@ export async function POST(request: Request) {
   }
 
   const payload: Record<string, unknown> = {
+    ok: true,
     challengeId: challenge.id,
     expiresInSec: Math.floor(OTP_TTL_MS / 1000),
     messageBn:

@@ -126,6 +126,70 @@ async function main() {
     });
   }
 
+  const doctorSeedPwd = process.env.DOCTOR_SEED_PASSWORD?.trim();
+  const doctorSeedEmail = process.env.DOCTOR_SEED_EMAIL?.trim()?.toLowerCase();
+  const doctorSeedPhoneRaw = process.env.DOCTOR_SEED_PHONE?.trim();
+  if (doctorSeedPwd && doctorSeedEmail && doctorSeedPhoneRaw) {
+    const docPhone = normalizeBangladeshPhone(doctorSeedPhoneRaw);
+    if (!docPhone) {
+      throw new Error(
+        `DOCTOR_SEED_PHONE must be a valid Bangladesh mobile (got "${doctorSeedPhoneRaw}").`,
+      );
+    }
+    const firstArea = await prisma.area.findFirst({
+      where: { isActive: true, slug: { not: "onnanno" } },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true },
+    });
+    if (!firstArea) {
+      console.warn("Seed: DOCTOR_SEED_* set but no active area — skipping dev doctor.");
+    } else {
+      const docName =
+        process.env.DOCTOR_SEED_NAME?.trim() || "Dev Seed Doctor";
+      const docHash = await bcrypt.hash(doctorSeedPwd, 12);
+      const existingDoc = await prisma.user.findFirst({
+        where: { email: doctorSeedEmail },
+        select: { id: true, role: true },
+      });
+      if (existingDoc) {
+        await prisma.user.update({
+          where: { id: existingDoc.id },
+          data: {
+            name: docName,
+            phone: docPhone,
+            email: doctorSeedEmail,
+            passwordHash: docHash,
+            role: UserRole.DOCTOR,
+            isActive: true,
+          },
+        });
+        const hasArea = await prisma.doctorArea.count({
+          where: { userId: existingDoc.id },
+        });
+        if (hasArea === 0) {
+          await prisma.doctorArea.create({
+            data: { userId: existingDoc.id, areaId: firstArea.id },
+          });
+        }
+      } else {
+        await prisma.user.create({
+          data: {
+            name: docName,
+            phone: docPhone,
+            email: doctorSeedEmail,
+            passwordHash: docHash,
+            role: UserRole.DOCTOR,
+            isActive: true,
+            doctorAreas: { create: [{ areaId: firstArea.id }] },
+          },
+        });
+      }
+      console.log(
+        `Seed: dev doctor upserted for email=${doctorSeedEmail} (login with DOCTOR_SEED_PASSWORD + mobile doctor login).`,
+      );
+    }
+  }
+
   console.log(
     `Seed OK: Main Admin id=${admin.id} email=${admin.email} (login with this email/phone + ADMIN_SEED_PASSWORD). Areas upserted: ${AREA_SEED_ROWS.length}. Site settings upserted: ${SITE_SETTING_SEED_ROWS.length}.`,
   );

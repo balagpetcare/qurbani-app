@@ -5,31 +5,32 @@ import {
   authCookieOptions,
   signAuthToken,
 } from "@/lib/auth-token";
+import {
+  pickDoctorLoginIdentifier,
+  pickDoctorLoginPassword,
+  type DoctorLoginJsonBody,
+} from "@/lib/doctor-login-body";
 import { authenticateDoctorWithPassword } from "@/lib/doctor-password-login";
 
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7;
 
-type Body = {
-  identifier?: unknown;
-  password?: unknown;
-};
-
 export async function POST(request: Request) {
-  let body: Body;
+  let body: DoctorLoginJsonBody;
   try {
-    body = (await request.json()) as Body;
+    body = (await request.json()) as DoctorLoginJsonBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const identifier =
-    typeof body.identifier === "string" ? body.identifier.trim() : "";
-  const password =
-    typeof body.password === "string" ? body.password : "";
+  const identifier = pickDoctorLoginIdentifier(body);
+  const password = pickDoctorLoginPassword(body);
 
   const result = await authenticateDoctorWithPassword(identifier, password);
   if ("error" in result && "status" in result) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json(
+      { error: result.error, messageBn: result.messageBn },
+      { status: result.status },
+    );
   }
 
   try {
@@ -47,7 +48,10 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("POST /api/doctor/login", err);
     return NextResponse.json(
-      { error: "Login temporarily unavailable." },
+      {
+        error: "Login temporarily unavailable.",
+        messageBn: "লগইন সাময়িকভাবে অনুপলব্ধ। একটু পরে আবার চেষ্টা করুন।",
+      },
       { status: 503 },
     );
   }

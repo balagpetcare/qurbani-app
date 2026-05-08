@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { mobileApiErrorBody } from "@/lib/api-json-response";
 import {
   AnimalKind,
   NotificationChannel,
@@ -75,11 +76,11 @@ function clamp(s: string, max: number): string {
 export async function POST(request: Request) {
   if (!(await getLeadFormEnabled())) {
     return NextResponse.json(
-      {
-        error: "LEAD_FORM_DISABLED",
-        messageBn:
-          "এই মুহূর্তে অনলাইন ফর্ম বন্ধ আছে। দয়া করে কল বা WhatsApp করে যোগাযোগ করুন।",
-      },
+      mobileApiErrorBody(
+        "LEAD_FORM_DISABLED",
+        "এই মুহূর্তে অনলাইন ফর্ম বন্ধ আছে। দয়া করে কল বা WhatsApp করে যোগাযোগ করুন।",
+        "Lead form disabled",
+      ),
       { status: 403 },
     );
   }
@@ -89,11 +90,11 @@ export async function POST(request: Request) {
     body = (await request.json()) as LeadBody;
   } catch {
     return NextResponse.json(
-      {
-        error: "Invalid JSON body",
-        messageBn:
-          "তথ্য পাঠাতে সমস্যা হয়েছে। পেজ রিফ্রেশ করে আবার চেষ্টা করুন।",
-      },
+      mobileApiErrorBody(
+        "INVALID_JSON",
+        "তথ্য পাঠাতে সমস্যা হয়েছে। পেজ রিফ্রেশ করে আবার চেষ্টা করুন।",
+        "Invalid JSON body",
+      ),
       { status: 400 },
     );
   }
@@ -120,10 +121,11 @@ export async function POST(request: Request) {
 
   if (!customerName || !phoneRaw) {
     return NextResponse.json(
-      {
-        error: "customerName and phone are required",
-        messageBn: "আপনার নাম ও মোবাইল নম্বর দিন।",
-      },
+      mobileApiErrorBody(
+        "MISSING_REQUIRED_FIELDS",
+        "আপনার নাম ও মোবাইল নম্বর দিন।",
+        "customerName and phone are required",
+      ),
       { status: 400 },
     );
   }
@@ -133,42 +135,41 @@ export async function POST(request: Request) {
 
   if (areaSelectionMissing) {
     return NextResponse.json(
-      {
-        error: "AREA_SELECTION_REQUIRED",
-        messageBn: "অনুগ্রহ করে আপনার এলাকা নির্বাচন করুন।",
-      },
+      mobileApiErrorBody(
+        "AREA_SELECTION_REQUIRED",
+        "অনুগ্রহ করে আপনার এলাকা নির্বাচন করুন।",
+      ),
       { status: 400 },
     );
   }
 
   if (bothProvided) {
     return NextResponse.json(
-      {
-        error: "AREA_AMBIGUOUS",
-        messageBn:
-          "এলাকা তালিকা থেকে বেছে নিন, অথবা শুধু ‘অন্যান্য’ অপশনে এলাকার নাম লিখুন।",
-      },
+      mobileApiErrorBody(
+        "AREA_AMBIGUOUS",
+        "এলাকা তালিকা থেকে বেছে নিন, অথবা শুধু ‘অন্যান্য’ অপশনে এলাকার নাম লিখুন।",
+      ),
       { status: 400 },
     );
   }
 
   if (areaId === undefined && customArea.length < 2) {
     return NextResponse.json(
-      {
-        error: "CUSTOM_AREA_REQUIRED",
-        messageBn:
-          "আপনার এলাকা তালিকায় না থাকলে ‘অন্যান্য’ নির্বাচন করে এলাকার নাম লিখুন।",
-      },
+      mobileApiErrorBody(
+        "CUSTOM_AREA_REQUIRED",
+        "আপনার এলাকা তালিকায় না থাকলে ‘অন্যান্য’ নির্বাচন করে এলাকার নাম লিখুন।",
+      ),
       { status: 400 },
     );
   }
 
   if (!serviceRequirement) {
     return NextResponse.json(
-      {
-        error: "serviceRequirement is required",
-        messageBn: "সমস্যাটা সংক্ষেপে লিখুন।",
-      },
+      mobileApiErrorBody(
+        "SERVICE_REQUIREMENT_REQUIRED",
+        "সমস্যাটা সংক্ষেপে লিখুন।",
+        "serviceRequirement is required",
+      ),
       { status: 400 },
     );
   }
@@ -177,10 +178,7 @@ export async function POST(request: Request) {
   if ("error" in intake) {
     const errText = intake.error;
     return NextResponse.json(
-      {
-        error: errText,
-        messageBn: errText,
-      },
+      mobileApiErrorBody("VALIDATION_ERROR", errText, errText),
       { status: 400 },
     );
   }
@@ -188,10 +186,11 @@ export async function POST(request: Request) {
 
   if (!extra.animalKind) {
     return NextResponse.json(
-      {
-        error: "animalKind is required",
-        messageBn: "পশুর ধরন বেছে নিন।",
-      },
+      mobileApiErrorBody(
+        "ANIMAL_KIND_REQUIRED",
+        "পশুর ধরন বেছে নিন।",
+        "animalKind is required",
+      ),
       { status: 400 },
     );
   }
