@@ -7,15 +7,14 @@ import {
 
 const PAYMENT_METHOD_VALUES = Object.values(PaymentMethod) as PaymentMethod[];
 
-/** Whole BDT amounts and policy inputs used when closing a case with billing. */
+/**
+ * Whole BDT amounts for closing a case. Commission base is **totalCollected only**
+ * (গ্রাহক থেকে সংগৃহীত টাকা). Medicine and travel are expense-only for reporting.
+ */
 export type BillingAmountInput = {
-  serviceFee: number;
-  medicineCharge: number;
-  transportCharge: number;
-  emergencyCharge: number;
-  otherCharge: number;
-  discountAmount: number;
   totalCollected: number;
+  medicineCost: number;
+  travelCost: number;
   /** Platform commission rate as percent, e.g. `10` means 10%. */
   platformCommissionRatePercent: number;
   paymentMethod: PaymentMethod;
@@ -34,39 +33,19 @@ function isNonNegativeInt(n: number): boolean {
   return Number.isInteger(n) && n >= 0;
 }
 
-function sumChargesBeforeDiscount(input: BillingAmountInput): number {
-  return (
-    input.serviceFee +
-    input.medicineCharge +
-    input.transportCharge +
-    input.emergencyCharge +
-    input.otherCharge
-  );
-}
-
 /** Stable codes for validation; map to Bengali in {@link billingValidationIssuesToBn}. */
 export type BillingValidationIssue =
-  | "SERVICE_FEE_INVALID"
-  | "MEDICINE_CHARGE_INVALID"
-  | "TRANSPORT_CHARGE_INVALID"
-  | "EMERGENCY_CHARGE_INVALID"
-  | "OTHER_CHARGE_INVALID"
-  | "DISCOUNT_INVALID"
   | "TOTAL_COLLECTED_INVALID"
-  | "DISCOUNT_EXCEEDS_CHARGES"
+  | "MEDICINE_COST_INVALID"
+  | "TRAVEL_COST_INVALID"
   | "COMMISSION_RATE_INVALID"
   | "PAYMENT_METHOD_INVALID";
 
 const ISSUE_BN: Record<BillingValidationIssue, string> = {
-  SERVICE_FEE_INVALID: "সার্ভিস ফি সঠিক পূর্ণসংখ্যা নয়",
-  MEDICINE_CHARGE_INVALID: "ঔষধ চার্জ সঠিক পূর্ণসংখ্যা নয়",
-  TRANSPORT_CHARGE_INVALID: "পরিবহন চার্জ সঠিক পূর্ণসংখ্যা নয়",
-  EMERGENCY_CHARGE_INVALID: "জরুরি চার্জ সঠিক পূর্ণসংখ্যা নয়",
-  OTHER_CHARGE_INVALID: "অন্যান্য চার্জ সঠিক পূর্ণসংখ্যা নয়",
-  DISCOUNT_INVALID: "ছাড়ের পরিমাণ সঠিক পূর্ণসংখ্যা নয়",
-  TOTAL_COLLECTED_INVALID: "মোট গৃহীত টাকা সঠিক পূর্ণসংখ্যা নয়",
-  DISCOUNT_EXCEEDS_CHARGES:
-    "ছাড় মোট চার্জের চেয়ে বেশি হতে পারবে না (সার্ভিস+ঔষধ+পরিবহন+জরুরি+অন্যান্য)",
+  TOTAL_COLLECTED_INVALID:
+    "কাস্টমার থেকে গৃহীত টাকা একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)",
+  MEDICINE_COST_INVALID: "মেডিসিন খরচ একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)",
+  TRAVEL_COST_INVALID: "যাতায়াত খরচ একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)",
   COMMISSION_RATE_INVALID: "প্ল্যাটফর্ম কমিশন হার ০–১০০ এর মধ্যে হতে হবে",
   PAYMENT_METHOD_INVALID: "পেমেন্ট পদ্ধতি সঠিক নয়",
 };
@@ -87,18 +66,9 @@ export function validateBillingAmountInput(input: BillingAmountInput): {
 } {
   const issues: BillingValidationIssue[] = [];
 
-  if (!isNonNegativeInt(input.serviceFee)) issues.push("SERVICE_FEE_INVALID");
-  if (!isNonNegativeInt(input.medicineCharge)) issues.push("MEDICINE_CHARGE_INVALID");
-  if (!isNonNegativeInt(input.transportCharge)) issues.push("TRANSPORT_CHARGE_INVALID");
-  if (!isNonNegativeInt(input.emergencyCharge)) issues.push("EMERGENCY_CHARGE_INVALID");
-  if (!isNonNegativeInt(input.otherCharge)) issues.push("OTHER_CHARGE_INVALID");
-  if (!isNonNegativeInt(input.discountAmount)) issues.push("DISCOUNT_INVALID");
   if (!isNonNegativeInt(input.totalCollected)) issues.push("TOTAL_COLLECTED_INVALID");
-
-  const beforeDiscount = sumChargesBeforeDiscount(input);
-  if (input.discountAmount > beforeDiscount) {
-    issues.push("DISCOUNT_EXCEEDS_CHARGES");
-  }
+  if (!isNonNegativeInt(input.medicineCost)) issues.push("MEDICINE_COST_INVALID");
+  if (!isNonNegativeInt(input.travelCost)) issues.push("TRAVEL_COST_INVALID");
 
   const rate = input.platformCommissionRatePercent;
   if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
@@ -112,24 +82,14 @@ export function validateBillingAmountInput(input: BillingAmountInput): {
   return issues.length === 0 ? { ok: true } : { ok: false, issues };
 }
 
-/**
- * Commission base: service fee + emergency charge (initial policy per product spec).
- */
+/** Commission base = amount collected from customer only. */
 export function computeCommissionableAmount(input: BillingAmountInput): number {
-  return input.serviceFee + input.emergencyCharge;
+  return input.totalCollected;
 }
 
-/**
- * grossAmount = sum(line charges) - discount
- */
+/** Invoice total attributed to the customer payment (same as collected for this flow). */
 export function computeGrossAmount(input: BillingAmountInput): number {
-  const sum =
-    input.serviceFee +
-    input.medicineCharge +
-    input.transportCharge +
-    input.emergencyCharge +
-    input.otherCharge;
-  return Math.max(0, sum - input.discountAmount);
+  return input.totalCollected;
 }
 
 export function computePlatformCommissionAmount(
@@ -141,10 +101,10 @@ export function computePlatformCommissionAmount(
 }
 
 /**
- * dueAmount = grossAmount - totalCollected (may be negative if over-collected; callers may clamp for UI).
+ * No separate “bill vs collected” line items — বাকি treated as ০ for this product flow.
  */
-export function computeDueAmount(grossAmount: number, totalCollected: number): number {
-  return grossAmount - totalCollected;
+export function computeDueAmount(): number {
+  return 0;
 }
 
 /**
@@ -179,7 +139,7 @@ export function computeBillingDerivedAmounts(
     commissionableAmount,
     input.platformCommissionRatePercent,
   );
-  const dueAmount = computeDueAmount(grossAmount, input.totalCollected);
+  const dueAmount = computeDueAmount();
   const doctorEarningAmount = computeDoctorEarningAmount(
     input.totalCollected,
     platformCommissionAmount,

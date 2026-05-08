@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, LayoutDashboard, Settings } from "lucide-react";
+import { Banknote, ClipboardList, LayoutDashboard, Settings } from "lucide-react";
 
 import type { BottomNavItem } from "@/components/ui/BottomNav";
 
@@ -13,6 +13,11 @@ export function doctorBottomNavItems(): BottomNavItem[] {
       href: "/doctor",
       label: "ড্যাশবোর্ড",
       icon: <LayoutDashboard className={ic} aria-hidden />,
+    },
+    {
+      href: "/doctor/finance",
+      label: "ফিন্যান্স",
+      icon: <Banknote className={ic} aria-hidden />,
     },
     {
       href: "/doctor/leads",

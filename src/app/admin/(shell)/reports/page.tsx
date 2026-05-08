@@ -155,6 +155,23 @@ export default async function AdminDoctorReportsPage() {
       />
 
       <AdminMain className="space-y-4">
+        <AdminCard className="border-emerald-100 bg-emerald-50/60">
+          <Link
+            href="/admin/doctor-finance"
+            className="flex touch-manipulation flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p className="font-bold text-emerald-950">ডাক্তার ফিন্যান্স রিপোর্ট</p>
+              <p className="mt-1 text-sm text-emerald-900/90">
+                সমাপ্ত বিল, গৃহীত টাকা, মেডিসিন/যাতায়াত খরচ ও কমিশন সারাংশ।
+              </p>
+            </div>
+            <span className="mt-2 inline-flex text-sm font-semibold text-emerald-900 underline underline-offset-2 sm:mt-0">
+              খুলুন →
+            </span>
+          </Link>
+        </AdminCard>
+
         <AdminResponsiveTable className="hidden lg:block">
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead className="border-b border-zinc-200 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-600">

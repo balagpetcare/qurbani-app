@@ -128,6 +128,12 @@ export default async function DoctorDashboardPage() {
           >
             সব লিড দেখুন
           </Link>
+          <Link
+            href="/doctor/finance"
+            className="inline-flex min-h-[var(--q-touch-min)] w-full items-center justify-center rounded-2xl border-2 border-q-primary bg-q-primary-soft px-5 text-[15px] font-semibold text-q-primary-deep shadow-sm touch-manipulation hover:bg-emerald-100 sm:flex-1 sm:max-w-xs"
+          >
+            ফিন্যান্স সারাংশ
+          </Link>
         </div>
 
         {emergencyLeads.length > 0 ? (

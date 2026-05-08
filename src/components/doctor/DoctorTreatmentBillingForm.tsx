@@ -80,6 +80,18 @@ function formatTk(n: number): string {
   return `${n.toLocaleString("en-US")} ৳`;
 }
 
+function parseBillingInt(s: string): number | null {
+  const n = parseInt(s.trim(), 10);
+  return Number.isNaN(n) || !Number.isInteger(n) || n < 0 ? null : n;
+}
+
+/** Empty expense field → 0 */
+function parseBillingExpense(s: string): number | null {
+  const t = s.trim();
+  if (t === "") return 0;
+  return parseBillingInt(t);
+}
+
 const TREATMENT_LABELS: Record<TreatmentCompletionStatus, string> = {
   COMPLETED: "সম্পন্ন",
   FOLLOW_UP_NEEDED: "ফলোআপ প্রয়োজন",
@@ -153,13 +165,9 @@ export function DoctorTreatmentBillingForm({
   const [medicinesUsed, setMedicinesUsed] = useState(initialCase?.medicineAdvice ?? "");
   const [doctorNote, setDoctorNote] = useState(initialCase?.doctorAdvice ?? "");
 
-  const [serviceFee, setServiceFee] = useState("0");
-  const [medicineCharge, setMedicineCharge] = useState("0");
-  const [transportCharge, setTransportCharge] = useState("0");
-  const [emergencyCharge, setEmergencyCharge] = useState("0");
-  const [otherCharge, setOtherCharge] = useState("0");
-  const [discountAmount, setDiscountAmount] = useState("0");
-  const [totalCollected, setTotalCollected] = useState("0");
+  const [totalCollected, setTotalCollected] = useState("");
+  const [medicineCost, setMedicineCost] = useState("0");
+  const [travelCost, setTravelCost] = useState("0");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
 
   const [followUpRequired, setFollowUpRequired] = useState(
@@ -177,49 +185,22 @@ export function DoctorTreatmentBillingForm({
     initialCase?.showcaseSummary ?? "",
   );
 
-  const parseNum = (s: string) => {
-    const n = parseInt(s.trim(), 10);
-    return Number.isNaN(n) || !Number.isInteger(n) || n < 0 ? null : n;
-  };
-
   const billingPreviewInput: BillingAmountInput | null = useMemo(() => {
-    const sf = parseNum(serviceFee);
-    const mc = parseNum(medicineCharge);
-    const tc = parseNum(transportCharge);
-    const ec = parseNum(emergencyCharge);
-    const oc = parseNum(otherCharge);
-    const da = parseNum(discountAmount);
-    const col = parseNum(totalCollected);
-    if (
-      sf === null ||
-      mc === null ||
-      tc === null ||
-      ec === null ||
-      oc === null ||
-      da === null ||
-      col === null
-    ) {
-      return null;
-    }
+    const col = parseBillingInt(totalCollected);
+    const med = parseBillingExpense(medicineCost);
+    const tr = parseBillingExpense(travelCost);
+    if (col === null || med === null || tr === null) return null;
     return {
-      serviceFee: sf,
-      medicineCharge: mc,
-      transportCharge: tc,
-      emergencyCharge: ec,
-      otherCharge: oc,
-      discountAmount: da,
       totalCollected: col,
+      medicineCost: med,
+      travelCost: tr,
       platformCommissionRatePercent,
       paymentMethod,
     };
   }, [
-    serviceFee,
-    medicineCharge,
-    transportCharge,
-    emergencyCharge,
-    otherCharge,
-    discountAmount,
     totalCollected,
+    medicineCost,
+    travelCost,
     platformCommissionRatePercent,
     paymentMethod,
   ]);
@@ -278,6 +259,21 @@ export function DoctorTreatmentBillingForm({
       );
     }
 
+    const collected = parseBillingInt(totalCollected);
+    if (collected === null) {
+      throw new Error(
+        "কাস্টমার থেকে গৃহীত টাকা একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)",
+      );
+    }
+    const med = parseBillingExpense(medicineCost);
+    const tr = parseBillingExpense(travelCost);
+    if (med === null) {
+      throw new Error("মেডিসিন খরচ একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)");
+    }
+    if (tr === null) {
+      throw new Error("যাতায়াত খরচ একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)");
+    }
+
     const res = await fetch(`/api/doctor/leads/${leadId}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -288,13 +284,9 @@ export function DoctorTreatmentBillingForm({
         treatmentNote: treatmentNote.trim(),
         medicinesUsed: medicinesUsed.trim() || undefined,
         doctorNote: doctorNote.trim() || undefined,
-        serviceFee: parseNum(serviceFee) ?? 0,
-        medicineCharge: parseNum(medicineCharge) ?? 0,
-        transportCharge: parseNum(transportCharge) ?? 0,
-        emergencyCharge: parseNum(emergencyCharge) ?? 0,
-        otherCharge: parseNum(otherCharge) ?? 0,
-        discountAmount: parseNum(discountAmount) ?? 0,
-        totalCollected: parseNum(totalCollected) ?? 0,
+        totalCollectedFromCustomer: collected,
+        medicineCost: med,
+        travelCost: tr,
         paymentMethod,
         platformCommissionRatePercent,
         followUpRequired: effectiveFollowUp,
@@ -345,11 +337,19 @@ export function DoctorTreatmentBillingForm({
               <dd className="font-medium">{TREATMENT_LABELS[initialBilling.status]}</dd>
             </div>
             <div>
-              <dt className="text-xs text-zinc-500">মোট বিল (গ্রস)</dt>
-              <dd className="tabular-nums font-medium">{formatTk(initialBilling.grossAmount)}</dd>
+              <dt className="text-xs text-zinc-500">কাস্টমার থেকে গৃহীত</dt>
+              <dd className="tabular-nums font-medium">{formatTk(initialBilling.totalCollected)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-zinc-500">কমিশনযোগ্য</dt>
+              <dt className="text-xs text-zinc-500">মেডিসিন খরচ</dt>
+              <dd className="tabular-nums">{formatTk(initialBilling.medicineCharge)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-zinc-500">যাতায়াত খরচ</dt>
+              <dd className="tabular-nums">{formatTk(initialBilling.transportCharge)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-zinc-500">কমিশন হিসাবের ভিত্তি</dt>
               <dd className="tabular-nums">{formatTk(initialBilling.commissionableAmount)}</dd>
             </div>
             <div>
@@ -357,8 +357,10 @@ export function DoctorTreatmentBillingForm({
               <dd className="tabular-nums">{formatTk(initialBilling.platformCommissionAmount)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-zinc-500">বাকি</dt>
-              <dd className="tabular-nums">{formatTk(initialBilling.dueAmount)}</dd>
+              <dt className="text-xs text-zinc-500">ডাক্তার নিট আয়</dt>
+              <dd className="tabular-nums font-semibold text-emerald-900">
+                {formatTk(initialBilling.doctorEarningAmount)}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-zinc-500">প্ল্যাটফর্মে পরিশোধযোগ্য</dt>
@@ -476,83 +478,15 @@ export function DoctorTreatmentBillingForm({
 
         <section className="space-y-3 border-t border-zinc-100 pt-4">
           <h4 className="text-xs font-bold uppercase tracking-wide text-q-muted">
-            বিলিং তথ্য (টাকা — পূর্ণসংখ্যা)
+            আর্থিক তথ্য (টাকা — পূর্ণসংখ্যা)
           </h4>
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            কমিশন হিসাব শুধু <strong>কাস্টমার থেকে গৃহীত টাকার</strong> উপর। মেডিসিন ও যাতায়াত
+            খরচ শুধু রেকর্ড — কমিশন ভিত্তি নয়।
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-medium text-zinc-600">
-              সার্ভিস/ভিজিট ফি
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={serviceFee}
-                onChange={(e) => setServiceFee(e.target.value)}
-                disabled={!canDraft && !canSubmit}
-                className={`${inputCls} disabled:opacity-60`}
-              />
-            </label>
-            <label className="block text-xs font-medium text-zinc-600">
-              ঔষধ চার্জ
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={medicineCharge}
-                onChange={(e) => setMedicineCharge(e.target.value)}
-                disabled={!canDraft && !canSubmit}
-                className={`${inputCls} disabled:opacity-60`}
-              />
-            </label>
-            <label className="block text-xs font-medium text-zinc-600">
-              পরিবহন চার্জ
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={transportCharge}
-                onChange={(e) => setTransportCharge(e.target.value)}
-                disabled={!canDraft && !canSubmit}
-                className={`${inputCls} disabled:opacity-60`}
-              />
-            </label>
-            <label className="block text-xs font-medium text-zinc-600">
-              জরুরি চার্জ
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={emergencyCharge}
-                onChange={(e) => setEmergencyCharge(e.target.value)}
-                disabled={!canDraft && !canSubmit}
-                className={`${inputCls} disabled:opacity-60`}
-              />
-            </label>
-            <label className="block text-xs font-medium text-zinc-600">
-              অন্যান্য চার্জ
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={otherCharge}
-                onChange={(e) => setOtherCharge(e.target.value)}
-                disabled={!canDraft && !canSubmit}
-                className={`${inputCls} disabled:opacity-60`}
-              />
-            </label>
-            <label className="block text-xs font-medium text-zinc-600">
-              ছাড়
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(e.target.value)}
-                disabled={!canDraft && !canSubmit}
-                className={`${inputCls} disabled:opacity-60`}
-              />
-            </label>
-            <label className="block text-xs font-medium text-zinc-600">
-              মোট গৃহীত
+            <label className="block text-xs font-medium text-zinc-600 sm:col-span-2">
+              কাস্টমার থেকে গৃহীত টাকা *
               <input
                 type="number"
                 inputMode="numeric"
@@ -560,10 +494,35 @@ export function DoctorTreatmentBillingForm({
                 value={totalCollected}
                 onChange={(e) => setTotalCollected(e.target.value)}
                 disabled={!canDraft && !canSubmit}
+                placeholder="উদা. ১৫০০"
                 className={`${inputCls} disabled:opacity-60`}
               />
             </label>
             <label className="block text-xs font-medium text-zinc-600">
+              মেডিসিন খরচ (ঐচ্ছিক, না দিলে ০)
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={medicineCost}
+                onChange={(e) => setMedicineCost(e.target.value)}
+                disabled={!canDraft && !canSubmit}
+                className={`${inputCls} disabled:opacity-60`}
+              />
+            </label>
+            <label className="block text-xs font-medium text-zinc-600">
+              যাতায়াত / হোম কল খরচ (ঐচ্ছিক, না দিলে ০)
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={travelCost}
+                onChange={(e) => setTravelCost(e.target.value)}
+                disabled={!canDraft && !canSubmit}
+                className={`${inputCls} disabled:opacity-60`}
+              />
+            </label>
+            <label className="block text-xs font-medium text-zinc-600 sm:col-span-2">
               পেমেন্ট পদ্ধতি
               <select
                 value={paymentMethod}
@@ -592,11 +551,19 @@ export function DoctorTreatmentBillingForm({
           {preview ? (
             <ul className="space-y-1.5 text-sm text-emerald-950">
               <li className="flex justify-between gap-2">
-                <span>মোট বিল (গ্রস)</span>
+                <span>গৃহীত টাকা (কাস্টমার)</span>
                 <span className="tabular-nums font-semibold">{formatTk(preview.grossAmount)}</span>
               </li>
-              <li className="flex justify-between gap-2">
-                <span>কমিশনযোগ্য</span>
+              <li className="flex justify-between gap-2 border-t border-emerald-200/80 pt-1.5 text-xs text-emerald-900/90">
+                <span>মেডিসিন খরচ (রেকর্ড)</span>
+                <span className="tabular-nums">{formatTk(parseBillingExpense(medicineCost) ?? 0)}</span>
+              </li>
+              <li className="flex justify-between gap-2 text-xs text-emerald-900/90">
+                <span>যাতায়াত খরচ (রেকর্ড)</span>
+                <span className="tabular-nums">{formatTk(parseBillingExpense(travelCost) ?? 0)}</span>
+              </li>
+              <li className="flex justify-between gap-2 border-t border-emerald-200/80 pt-1.5">
+                <span>কমিশনের ভিত্তি (= গৃহীত)</span>
                 <span className="tabular-nums">{formatTk(preview.commissionableAmount)}</span>
               </li>
               <li className="flex justify-between gap-2">
@@ -604,8 +571,10 @@ export function DoctorTreatmentBillingForm({
                 <span className="tabular-nums">{formatTk(preview.platformCommissionAmount)}</span>
               </li>
               <li className="flex justify-between gap-2">
-                <span>গ্রাহকের বাকি</span>
-                <span className="tabular-nums">{formatTk(preview.dueAmount)}</span>
+                <span>ডাক্তার নিট আয় (প্রিভিউ)</span>
+                <span className="tabular-nums font-semibold text-emerald-950">
+                  {formatTk(preview.doctorEarningAmount)}
+                </span>
               </li>
               <li className="flex justify-between gap-2">
                 <span>প্ল্যাটফর্মে পরিশোধযোগ্য</span>

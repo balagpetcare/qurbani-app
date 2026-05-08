@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 
 const links = [
   {
-    href: "/admin/moderation/tutorials",
-    label: "টিউটোরিয়াল মডারেশন",
-    desc: "ডাক্তারদের ভিডিও বিষয়বস্তু অনুমোদন",
+    href: "/admin/doctor-finance",
+    label: "ডাক্তার ফিন্যান্স",
+    desc: "সমাপ্ত বিল ও ডাক্তার অনুযায়ী আর্থিক রিপোর্ট",
   },
   {
     href: "/admin/moderation/case-histories",

@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  Banknote,
   ClipboardList,
   Home,
   LayoutDashboard,
@@ -30,6 +31,7 @@ const MOBILE_TOP_PILLS: {
   Icon: LucideIcon;
 }[] = [
   { href: "/doctor", label: "ড্যাশবোর্ড", matchPrefix: false, Icon: LayoutDashboard },
+  { href: "/doctor/finance", label: "ফিন্যান্স", matchPrefix: false, Icon: Banknote },
   { href: "/doctor/leads", label: "লিড তালিকা", matchPrefix: true, Icon: ClipboardList },
   { href: "/doctor/settings", label: "সেটিংস", matchPrefix: false, Icon: Settings },
 ];
@@ -46,6 +48,7 @@ const DESKTOP_LINKS: {
   Icon: LucideIcon;
 }[] = [
   { href: "/doctor", label: "ড্যাশবোর্ড", Icon: LayoutDashboard },
+  { href: "/doctor/finance", label: "ফিন্যান্স", Icon: Banknote },
   { href: "/doctor/leads", label: "লিড তালিকা", Icon: ClipboardList },
   { href: "/doctor/settings", label: "সেটিংস", Icon: Settings },
   { href: "/", label: "হোম", Icon: Home },

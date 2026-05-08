@@ -62,6 +62,12 @@ function parseNonNegativeInt(raw: unknown): number | null {
   return null;
 }
 
+/** Empty / omitted → 0; invalid → null */
+function parseExpenseAmount(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === "") return 0;
+  return parseNonNegativeInt(raw);
+}
+
 function parseCommissionRate(raw: unknown, fallback: number): number {
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
   if (typeof raw === "string" && raw.trim() !== "") {
@@ -116,32 +122,47 @@ export async function POST(request: Request, context: RouteContext) {
   const treatmentGiven = treatmentNote;
   const medicineAdvice = medicinesUsed ?? asTrimmedString(body.medicineAdvice);
 
-  const serviceFee = parseNonNegativeInt(body.serviceFee);
-  const medicineCharge = parseNonNegativeInt(body.medicineCharge);
-  const transportCharge = parseNonNegativeInt(body.transportCharge);
-  const emergencyCharge = parseNonNegativeInt(body.emergencyCharge);
-  const otherCharge = parseNonNegativeInt(body.otherCharge);
-  const discountAmount = parseNonNegativeInt(body.discountAmount);
-  const totalCollected = parseNonNegativeInt(body.totalCollected);
+  const totalCollected =
+    parseNonNegativeInt(body.totalCollectedFromCustomer) ??
+    parseNonNegativeInt(body.totalCollected);
 
-  if (serviceFee === null || medicineCharge === null || transportCharge === null) {
-    return NextResponse.json(
-      { error: "সার্ভিস ফি, ঔষধ ও পরিবহন চার্জ সঠিক সংখ্যায় দিন" },
-      { status: 400 },
-    );
-  }
-  if (emergencyCharge === null || otherCharge === null || discountAmount === null) {
-    return NextResponse.json(
-      { error: "জরুরি, অন্যান্য চার্জ ও ছাড় সঠিক সংখ্যায় দিন" },
-      { status: 400 },
-    );
-  }
+  const medicineChargeParsed = parseExpenseAmount(
+    body.medicineCost ?? body.medicineCharge,
+  );
+  const transportChargeParsed = parseExpenseAmount(
+    body.travelCost ?? body.transportCharge,
+  );
+
+  const serviceFee = parseNonNegativeInt(body.serviceFee) ?? 0;
+  const emergencyCharge = parseNonNegativeInt(body.emergencyCharge) ?? 0;
+  const otherCharge = parseNonNegativeInt(body.otherCharge) ?? 0;
+  const discountAmount = parseNonNegativeInt(body.discountAmount) ?? 0;
+
   if (totalCollected === null) {
     return NextResponse.json(
-      { error: "মোট গৃহীত টাকা সঠিক সংখ্যায় দিন" },
+      {
+        error:
+          "কাস্টমার থেকে গৃহীত টাকা একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)",
+      },
       { status: 400 },
     );
   }
+
+  if (medicineChargeParsed === null) {
+    return NextResponse.json(
+      { error: "মেডিসিন খরচ একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)" },
+      { status: 400 },
+    );
+  }
+  if (transportChargeParsed === null) {
+    return NextResponse.json(
+      { error: "যাতায়াত খরচ একটি সঠিক পূর্ণসংখ্যা দিন (০ বা তার বেশি)" },
+      { status: 400 },
+    );
+  }
+
+  const medicineCharge = medicineChargeParsed;
+  const transportCharge = transportChargeParsed;
 
   const paymentMethod = parsePaymentMethod(body.paymentMethod);
   if (!paymentMethod) {
@@ -209,13 +230,9 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const billingInput = {
-    serviceFee,
-    medicineCharge,
-    transportCharge,
-    emergencyCharge,
-    otherCharge,
-    discountAmount,
     totalCollected,
+    medicineCost: medicineCharge,
+    travelCost: transportCharge,
     platformCommissionRatePercent: rateSnapshot,
     paymentMethod,
   };

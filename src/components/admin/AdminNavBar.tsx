@@ -31,6 +31,7 @@ export function AdminNavBar({
     { href: "/admin/doctor-applications", label: "ডাক্তার আবেদন" },
     { href: "/admin/areas", label: "এলাকা ব্যবস্থাপনা" },
     { href: "/admin/reports", label: "রিপোর্ট" },
+    { href: "/admin/doctor-finance", label: "ডাক্তার ফিন্যান্স" },
     { href: "/admin/notifications", label: "নোটিফিকেশন" },
   ];
   if (showSettingsLink) {
