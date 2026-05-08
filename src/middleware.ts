@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { verifyAuthFromRequest } from "@/lib/auth-token";
+import { doctorAuthenticatedLoginRedirectTarget } from "@/lib/doctor-login-redirect";
 
 const ADMIN_LOGIN = "/admin/login";
 const DOCTOR_LOGIN = "/doctor/login";
@@ -46,7 +47,18 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/doctor")) {
-    if (pathname === DOCTOR_LOGIN || pathname === "/doctor/apply") {
+    if (pathname === "/doctor/apply") {
+      return NextResponse.next();
+    }
+    if (pathname === DOCTOR_LOGIN) {
+      const dash = doctorAuthenticatedLoginRedirectTarget(
+        pathname,
+        payload,
+        request.nextUrl.searchParams.get("from"),
+      );
+      if (dash) {
+        return NextResponse.redirect(new URL(dash, request.url));
+      }
       return NextResponse.next();
     }
     if (!payload || payload.role !== "DOCTOR") {

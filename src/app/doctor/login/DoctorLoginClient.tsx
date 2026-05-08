@@ -2,17 +2,59 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { DoctorAppHeader } from "@/components/doctor/DoctorAppHeader";
 import { AppCard } from "@/components/ui/AppCard";
 import { AppShell } from "@/components/ui/AppShell";
+import { resolveDoctorPostLoginHref } from "@/lib/doctor-login-redirect";
 
 export function DoctorLoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [sessionPhase, setSessionPhase] = useState<"checking" | "ready">(
+    "checking",
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      let navigatedAway = false;
+      try {
+        const res = await fetch("/api/doctor/me", {
+          method: "GET",
+          credentials: "include",
+        });
+        if (cancelled) return;
+
+        if (res.ok) {
+          navigatedAway = true;
+          const target = resolveDoctorPostLoginHref(searchParams.get("from"));
+          router.replace(target);
+          router.refresh();
+          return;
+        }
+
+        if (res.status === 403) {
+          await fetch("/api/doctor/logout", {
+            method: "POST",
+            credentials: "include",
+          });
+        }
+      } catch {
+        /* show login form */
+      } finally {
+        if (!cancelled && !navigatedAway) setSessionPhase("ready");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, searchParams]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -37,13 +79,8 @@ export function DoctorLoginClient() {
       }
 
       const fromRaw = searchParams.get("from");
-      const from =
-        typeof fromRaw === "string" &&
-        fromRaw.startsWith("/") &&
-        !fromRaw.startsWith("//")
-          ? fromRaw
-          : "/doctor/leads";
-      router.replace(from);
+      const target = resolveDoctorPostLoginHref(fromRaw);
+      router.replace(target);
       router.refresh();
     } catch {
       setError("Network error.");
@@ -71,73 +108,86 @@ export function DoctorLoginClient() {
     >
       <div className="mx-auto flex min-h-[min(560px,calc(100dvh-10rem))] w-full min-w-0 max-w-md flex-col justify-center py-8 sm:py-12">
         <AppCard variant="default" className="p-6 sm:p-8">
-          <p className="text-sm leading-relaxed text-q-muted">
-            অ্যাডমিন কর্তৃক তৈরি ইমেইল বা ফোন ও পাসওয়ার্ড ব্যবহার করুন।
-          </p>
-
-          {error ? (
-            <div
-              className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-900 ring-1 ring-red-200"
-              role="alert"
-            >
-              {error}
-            </div>
+          {sessionPhase === "checking" ? (
+            <p className="text-center text-sm text-q-muted">
+              সেশন যাচাই করা হচ্ছে...
+            </p>
           ) : null}
 
-          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-            <div>
-              <label
-                htmlFor="doc-ident"
-                className="block text-sm font-semibold text-zinc-800"
-              >
-                ইমেইল বা ফোন
-              </label>
-              <input
-                id="doc-ident"
-                name="identifier"
-                required
-                autoComplete="username"
-                className={fieldClass}
-                placeholder="ইমেইল অথবা ০১১…"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="doc-pass"
-                className="block text-sm font-semibold text-zinc-800"
-              >
-                পাসওয়ার্ড
-              </label>
-              <input
-                id="doc-pass"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                className={fieldClass}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="min-h-[var(--q-touch-min)] w-full touch-manipulation rounded-2xl bg-q-primary py-3.5 text-base font-bold text-white shadow-sm hover:brightness-95 disabled:opacity-60"
-            >
-              {loading ? "লগইন…" : "লগইন"}
-            </button>
-          </form>
+          {sessionPhase === "ready" ? (
+            <>
+              <p className="text-sm leading-relaxed text-q-muted">
+                অ্যাডমিন কর্তৃক তৈরি ইমেইল বা ফোন ও পাসওয়ার্ড ব্যবহার করুন।
+              </p>
 
-          <p className="mt-6 text-center text-xs text-q-muted">
-            <Link
-              href="/doctor/apply"
-              className="font-semibold text-q-primary-deep underline-offset-2 hover:underline"
-            >
-              নতুন ডাক্তার আবেদন
-            </Link>
-            {" · "}
-            <Link href="/" className="font-semibold text-q-primary-deep underline-offset-2 hover:underline">
-              হোম
-            </Link>
-          </p>
+              {error ? (
+                <div
+                  className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-900 ring-1 ring-red-200"
+                  role="alert"
+                >
+                  {error}
+                </div>
+              ) : null}
+
+              <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+                <div>
+                  <label
+                    htmlFor="doc-ident"
+                    className="block text-sm font-semibold text-zinc-800"
+                  >
+                    ইমেইল বা ফোন
+                  </label>
+                  <input
+                    id="doc-ident"
+                    name="identifier"
+                    required
+                    autoComplete="username"
+                    className={fieldClass}
+                    placeholder="ইমেইল অথবা ০১১…"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="doc-pass"
+                    className="block text-sm font-semibold text-zinc-800"
+                  >
+                    পাসওয়ার্ড
+                  </label>
+                  <input
+                    id="doc-pass"
+                    name="password"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    className={fieldClass}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="min-h-[var(--q-touch-min)] w-full touch-manipulation rounded-2xl bg-q-primary py-3.5 text-base font-bold text-white shadow-sm hover:brightness-95 disabled:opacity-60"
+                >
+                  {loading ? "লগইন…" : "লগইন"}
+                </button>
+              </form>
+
+              <p className="mt-6 text-center text-xs text-q-muted">
+                <Link
+                  href="/doctor/apply"
+                  className="font-semibold text-q-primary-deep underline-offset-2 hover:underline"
+                >
+                  নতুন ডাক্তার আবেদন
+                </Link>
+                {" · "}
+                <Link
+                  href="/"
+                  className="font-semibold text-q-primary-deep underline-offset-2 hover:underline"
+                >
+                  হোম
+                </Link>
+              </p>
+            </>
+          ) : null}
         </AppCard>
       </div>
     </AppShell>
