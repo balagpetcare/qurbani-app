@@ -19,8 +19,9 @@ if (!connectionString) {
 const adapter = new PrismaPg(connectionString);
 const prisma = new PrismaClient({ adapter });
 
-const DEFAULT_ADMIN_EMAIL = "balag.bd@gmail.com";
-const DEFAULT_ADMIN_PHONE = "01777889994";
+/** Defaults only when ADMIN_SEED_EMAIL / ADMIN_SEED_PHONE are unset — override in `.env` for real deploys. */
+const DEFAULT_ADMIN_EMAIL = "admin@example.com";
+const DEFAULT_ADMIN_PHONE = "01999999999";
 
 async function main() {
   const password = process.env.ADMIN_SEED_PASSWORD;

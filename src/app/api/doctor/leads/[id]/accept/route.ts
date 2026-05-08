@@ -11,6 +11,7 @@ import { appendLeadStatusHistory, isLeadStatusTerminal } from "@/lib/lead-workfl
 import { logOps } from "@/lib/ops-log";
 import { prisma } from "@/lib/prisma";
 import { queueInAppNotification } from "@/lib/queue-in-app-notification";
+import { notifyCustomerDoctorAcceptedSms } from "@/lib/sms-lead-notifications";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -139,6 +140,9 @@ export async function POST(request: Request, context: RouteContext) {
           leadId: id,
         });
       }
+      void notifyCustomerDoctorAcceptedSms(id).catch((e) =>
+        console.error("[sms] doctor accept notify customer", e),
+      );
     }
 
     return NextResponse.json({ success: true });

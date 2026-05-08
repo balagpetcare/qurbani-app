@@ -25,6 +25,7 @@ import {
   getBillingPlatformCommissionRatePercent,
   getDoctorInAppNotificationsEnabled,
 } from "@/lib/site-settings";
+import { notifyCustomerLeadStatusSms } from "@/lib/sms-lead-notifications";
 import { asTrimmedString } from "@/lib/validators";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -379,6 +380,12 @@ export async function POST(request: Request, context: RouteContext) {
         });
       }
     });
+
+    void notifyCustomerLeadStatusSms({
+      leadId: id,
+      fromStatus: lead.status,
+      toStatus: nextLeadStatus,
+    }).catch((e) => console.error("[sms] doctor complete", e));
 
     logOps("doctor_case_completed", {
       leadId: id,

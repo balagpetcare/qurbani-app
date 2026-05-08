@@ -10,6 +10,7 @@ import {
   isLeadStatusTerminal,
 } from "@/lib/lead-workflow";
 import { prisma } from "@/lib/prisma";
+import { notifyCustomerLeadStatusSms } from "@/lib/sms-lead-notifications";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -121,6 +122,12 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       return updated;
     });
+
+    void notifyCustomerLeadStatusSms({
+      leadId: id,
+      fromStatus: existing.status,
+      toStatus: nextStatus,
+    }).catch((e) => console.error("[sms] doctor lead status", e));
 
     return NextResponse.json({
       success: true,

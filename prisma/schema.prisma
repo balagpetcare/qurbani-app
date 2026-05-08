@@ -65,6 +65,13 @@ enum NotificationStatus {
   CANCELLED
 }
 
+enum SmsLogStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 enum NotificationType {
   NEW_LEAD
   DOCTOR_ASSIGNED
@@ -300,6 +307,7 @@ model User {
   /// When set, customer has completed OTP verification for [phone] (or legacy backfill).
   phoneVerifiedAt             DateTime?
   customerSocialLinks         CustomerSocialLink[]
+  smsLogs                     SmsLog[]
 }
 
 /// Links a CUSTOMER user to a stable subject from Google / Facebook / Apple (no refresh tokens stored here).
@@ -375,6 +383,8 @@ model DoctorApplicationArea {
 
 model Lead {
   id                  Int         @id @default(autoincrement())
+  /// Opaque public tracking token for `/track/[code]` (no sequential id in URLs/SMS).
+  publicTrackingCode  String?     @unique
   customerName        String
   phone               String
   whatsapp            String?
@@ -431,9 +441,32 @@ model Lead {
   caseBilling         LeadCaseBilling?
   statusHistory       LeadStatusHistory[]
   publicCaseHistory   PublicCaseHistory?
+  smsLogs             SmsLog[]
 
   @@index([priority])
   @@index([phone, createdAt])
+}
+
+/// Outbound SMS audit trail (BulkSMSBD); never stores API keys or full OTP body.
+model SmsLog {
+  id               String       @id @default(cuid())
+  phone            String
+  normalizedPhone  String
+  messagePreview   String
+  purpose          String
+  provider         String       @default("bulksmsbd")
+  providerCode     String?
+  providerMessage  String?
+  status           SmsLogStatus @default(PENDING)
+  leadId           Int?
+  lead             Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  userId           Int?
+  user             User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt        DateTime     @default(now())
+
+  @@index([leadId])
+  @@index([normalizedPhone, createdAt])
+  @@index([purpose, createdAt])
 }
 
 /// One-time password challenge for mobile customer login. Plain OTP is never stored.

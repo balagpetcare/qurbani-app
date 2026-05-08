@@ -5,6 +5,7 @@ import { LeadStatus } from "@/generated/prisma/enums";
 import { requireAdminFromRequest } from "@/lib/auth-guards";
 import { appendLeadStatusHistory } from "@/lib/lead-workflow";
 import { prisma } from "@/lib/prisma";
+import { notifyCustomerLeadStatusSms } from "@/lib/sms-lead-notifications";
 
 const ALLOWED_STATUSES = new Set<string>(Object.values(LeadStatus));
 
@@ -80,6 +81,12 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       return updated;
     });
+
+    void notifyCustomerLeadStatusSms({
+      leadId: id,
+      fromStatus: existing.status,
+      toStatus: statusRaw as LeadStatusType,
+    }).catch((e) => console.error("[sms] admin lead status", e));
 
     return NextResponse.json({
       success: true,

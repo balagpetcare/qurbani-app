@@ -106,6 +106,9 @@ export function SimpleRequestForm({
   const [successLeadId, setSuccessLeadId] = useState<number | undefined>(
     undefined,
   );
+  const [successTrackingCode, setSuccessTrackingCode] = useState<
+    string | undefined
+  >(undefined);
   const [serverMessageBn, setServerMessageBn] = useState<string>("");
 
   const [animalKind, setAnimalKind] = useState("");
@@ -260,6 +263,7 @@ export function SimpleRequestForm({
         error?: string;
         messageBn?: string;
         id?: number;
+        trackingCode?: string;
       };
 
       if (!res.ok) {
@@ -282,6 +286,11 @@ export function SimpleRequestForm({
       }
 
       setSuccessLeadId(typeof data.id === "number" ? data.id : undefined);
+      setSuccessTrackingCode(
+        typeof data.trackingCode === "string" && data.trackingCode.trim()
+          ? data.trackingCode.trim()
+          : undefined,
+      );
       setSuccessDialogOpen(true);
     } catch {
       setNetworkDialogOpen(true);
@@ -314,11 +323,15 @@ export function SimpleRequestForm({
       setCustomArea("");
     }
     setSuccessDialogOpen(false);
+    const extra =
+      successTrackingCode !== undefined && successTrackingCode !== ""
+        ? `&track=${encodeURIComponent(successTrackingCode)}`
+        : "";
     const q = successLeadId
-      ? `?leadId=${encodeURIComponent(String(successLeadId))}`
+      ? `?leadId=${encodeURIComponent(String(successLeadId))}${extra}`
       : "";
     router.push(`/thank-you${q}`);
-  }, [initialAreas, prefillAreaId, router, successLeadId]);
+  }, [initialAreas, prefillAreaId, router, successLeadId, successTrackingCode]);
 
   if (!leadFormEnabled) {
     return (

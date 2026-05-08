@@ -18,6 +18,8 @@ import { maskPhoneForLog, logOps } from "@/lib/ops-log";
 import { parsePublicLeadIntake } from "@/lib/public-lead-intake";
 import { prisma } from "@/lib/prisma";
 import { assertLeadSubmissionAllowed } from "@/lib/public-rate-limit";
+import { getPublicAppUrl } from "@/lib/server/sms/sms-env";
+import { notifyLeadCreatedSms, randomLeadTrackingCode } from "@/lib/sms-lead-notifications";
 import {
   getAdminInAppNotificationsEnabled,
   getEmergencyLeadEnabled,
@@ -306,8 +308,22 @@ export async function POST(request: Request) {
           undefined
         : customArea;
 
+    let publicTrackingCode: string | undefined;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const code = randomLeadTrackingCode();
+      const clash = await prisma.lead.findUnique({
+        where: { publicTrackingCode: code },
+        select: { id: true },
+      });
+      if (!clash) {
+        publicTrackingCode = code;
+        break;
+      }
+    }
+
     const lead = await prisma.lead.create({
       data: {
+        publicTrackingCode,
         customerName,
         phone,
         whatsapp: whatsappNormalized,
@@ -382,8 +398,30 @@ export async function POST(request: Request) {
       emergency: lead.priority === LeadPriority.EMERGENCY,
     });
 
+    let smsStatus: "sent" | "failed" | "skipped" = "skipped";
+    try {
+      const sm = await notifyLeadCreatedSms(lead.id);
+      smsStatus = sm.customer;
+    } catch (smsErr) {
+      console.error("POST /api/leads: SMS bundle", smsErr);
+    }
+
+    const base = getPublicAppUrl();
+    const trackingUrl =
+      publicTrackingCode && base
+        ? `${base}/track/${publicTrackingCode}`
+        : publicTrackingCode
+          ? `/track/${publicTrackingCode}`
+          : undefined;
+
     return NextResponse.json(
-      { success: true, id: lead.id },
+      {
+        success: true,
+        id: lead.id,
+        trackingCode: publicTrackingCode,
+        trackingUrl,
+        smsStatus,
+      },
       { status: 201 },
     );
   } catch (err) {

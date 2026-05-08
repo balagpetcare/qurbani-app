@@ -9,17 +9,16 @@ import {
   OTP_GENERIC_ERROR_BN,
   OTP_PHONE_INVALID_BN,
   OTP_PHONE_NOT_ELIGIBLE_BN,
+  OTP_RATE_LIMIT_BN,
   OTP_SENT_DEV_BN,
   OTP_SENT_HINT_BN,
 } from "@/lib/mobile-customer-otp-messages";
+import { assertOtpSendDbRules } from "@/lib/otp-rate-guard";
 import { prisma } from "@/lib/prisma";
 import { normalizeBangladeshPhone } from "@/lib/phone";
-import {
-  assertMobileOtpStartAllowed,
-  PUBLIC_RATE_LIMIT_MESSAGE_BN,
-} from "@/lib/public-rate-limit";
+import { assertMobileOtpStartAllowed } from "@/lib/public-rate-limit";
 
-const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_TTL_MS = 5 * 60 * 1000;
 const BCRYPT_ROUNDS = 10;
 
 type Body = { phone?: unknown };
@@ -62,16 +61,16 @@ export async function POST(request: Request) {
 
   const rl = assertMobileOtpStartAllowed(request, phoneCanon);
   if (rl) {
-    const text = await rl.text();
-    let messageBn = PUBLIC_RATE_LIMIT_MESSAGE_BN;
-    try {
-      const j = JSON.parse(text) as { error?: string };
-      if (typeof j.error === "string" && j.error.length) messageBn = j.error;
-    } catch {
-      /* ignore */
-    }
     return NextResponse.json(
-      mobileApiErrorBody("RATE_LIMIT", messageBn, "Rate limited"),
+      mobileApiErrorBody("RATE_LIMIT", OTP_RATE_LIMIT_BN, "Rate limited"),
+      { status: 429 },
+    );
+  }
+
+  const dbRl = await assertOtpSendDbRules(phoneCanon);
+  if (!dbRl.ok) {
+    return NextResponse.json(
+      mobileApiErrorBody("RATE_LIMIT", dbRl.messageBn, "Rate limited"),
       { status: 429 },
     );
   }
@@ -104,7 +103,8 @@ export async function POST(request: Request) {
     });
   }
 
-  let smsReason: "disabled" | "missing_env" | "ok" | "http_error" = "disabled";
+  let smsReason: "disabled" | "missing_env" | "ok" | "http_error" | "dry_run" =
+    "disabled";
   try {
     const r = await sendCustomerOtpSmsIfConfigured(phoneCanon, plainCode);
     smsReason = r.reason;
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     messageBn:
       smsReason === "ok"
         ? OTP_SENT_HINT_BN
-        : isDevNodeEnv()
+        : smsReason === "dry_run" && isDevNodeEnv()
           ? OTP_SENT_DEV_BN
           : OTP_SENT_HINT_BN,
   };

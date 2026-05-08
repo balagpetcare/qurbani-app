@@ -1,0 +1,51 @@
+import { getSmsBrandName } from "@/lib/server/sms/sms-env";
+
+export function buildOtpSmsBody(plainCode: string): string {
+  const brand = getSmsBrandName();
+  return `Your ${brand} OTP is ${plainCode}`;
+}
+
+export function buildLeadTrackingSms(trackingUrl: string): string {
+  return `Quarbani 2026: আপনার চিকিৎসা রিকোয়েস্ট গ্রহণ করা হয়েছে। ট্র্যাক করুন: ${trackingUrl}`;
+}
+
+export function buildDoctorNewLeadSms(areaName: string, leadUrl: string): string {
+  return `Quarbani 2026: নতুন চিকিৎসা রিকোয়েস্ট এসেছে। এলাকা: ${areaName}. দেখুন: ${leadUrl}`;
+}
+
+export function buildAdminNewLeadSms(areaName: string, leadUrl: string): string {
+  return buildDoctorNewLeadSms(areaName, leadUrl);
+}
+
+export function buildCustomerLeadAcceptedSms(trackingUrl: string): string {
+  return `Quarbani 2026: আপনার রিকোয়েস্ট একজন ডাক্তার গ্রহণ করেছেন। আপডেট দেখুন: ${trackingUrl}`;
+}
+
+export function customerStatusSmsBody(
+  statusKey:
+    | "ASSIGNED"
+    | "ACCEPTED"
+    | "IN_PROGRESS"
+    | "COMPLETED"
+    | "FOLLOW_UP_NEEDED"
+    | "CANCELLED",
+  trackingUrl: string,
+): string | null {
+  const brand = getSmsBrandName();
+  switch (statusKey) {
+    case "ASSIGNED":
+      return `${brand}: আপনার রিকোয়েস্টে একজন ডাক্তার যুক্ত হয়েছেন। দেখুন: ${trackingUrl}`;
+    case "ACCEPTED":
+      return `${brand}: আপনার রিকোয়েস্ট গ্রহণ করা হয়েছে। দেখুন: ${trackingUrl}`;
+    case "IN_PROGRESS":
+      return `${brand}: ডাক্তার চিকিৎসা শুরু করেছেন / পথে আছেন। আপডেট: ${trackingUrl}`;
+    case "COMPLETED":
+      return `${brand}: আপনার চিকিৎসা রিকোয়েস্ট সম্পন্ন হয়েছে। দেখুন: ${trackingUrl}`;
+    case "FOLLOW_UP_NEEDED":
+      return `${brand}: ফলোআপ প্রয়োজন হতে পারে। দেখুন: ${trackingUrl}`;
+    case "CANCELLED":
+      return `${brand}: আপনার রিকোয়েস্ট বাতিল করা হয়েছে। বিস্তারিত: ${trackingUrl}`;
+    default:
+      return null;
+  }
+}

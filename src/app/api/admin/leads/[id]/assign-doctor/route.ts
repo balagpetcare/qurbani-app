@@ -12,6 +12,7 @@ import { appendLeadStatusHistory } from "@/lib/lead-workflow";
 import { logOps } from "@/lib/ops-log";
 import { prisma } from "@/lib/prisma";
 import { queueInAppNotification } from "@/lib/queue-in-app-notification";
+import { notifyCustomerLeadStatusSms } from "@/lib/sms-lead-notifications";
 import { formatLeadAnimalDisplay } from "@/lib/lead-display";
 import { phoneToWhatsAppNumber } from "@/lib/phone";
 import { getDoctorInAppNotificationsEnabled } from "@/lib/site-settings";
@@ -292,6 +293,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       console.error(
         "PATCH /api/admin/leads/[id]/assign-doctor: notification queue",
         notifyErr,
+      );
+    }
+
+    if (nextStatus !== prevStatus) {
+      void notifyCustomerLeadStatusSms({
+        leadId,
+        fromStatus: prevStatus,
+        toStatus: nextStatus,
+      }).catch((e) =>
+        console.error("[sms] admin assign customer status", e),
       );
     }
 

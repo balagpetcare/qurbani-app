@@ -16,15 +16,13 @@ import {
   OTP_GENERIC_ERROR_BN,
   OTP_PHONE_INVALID_BN,
   OTP_PHONE_NOT_ELIGIBLE_BN,
+  OTP_RATE_LIMIT_BN,
   OTP_TOO_MANY_ATTEMPTS_BN,
   OTP_WRONG_CODE_BN,
 } from "@/lib/mobile-customer-otp-messages";
 import { prisma } from "@/lib/prisma";
 import { normalizeBangladeshPhone } from "@/lib/phone";
-import {
-  assertMobileOtpVerifyAllowed,
-  PUBLIC_RATE_LIMIT_MESSAGE_BN,
-} from "@/lib/public-rate-limit";
+import { assertMobileOtpVerifyAllowed } from "@/lib/public-rate-limit";
 
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
 const MAX_OTP_ATTEMPTS = 5;
@@ -81,16 +79,8 @@ export async function POST(request: Request) {
 
   const rl = assertMobileOtpVerifyAllowed(request, phoneCanon);
   if (rl) {
-    const text = await rl.text();
-    let messageBn = PUBLIC_RATE_LIMIT_MESSAGE_BN;
-    try {
-      const j = JSON.parse(text) as { error?: string };
-      if (typeof j.error === "string" && j.error.length) messageBn = j.error;
-    } catch {
-      /* ignore */
-    }
     return NextResponse.json(
-      mobileApiErrorBody("RATE_LIMIT", messageBn, "Rate limited"),
+      mobileApiErrorBody("RATE_LIMIT", OTP_RATE_LIMIT_BN, "Rate limited"),
       { status: 429 },
     );
   }

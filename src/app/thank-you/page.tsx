@@ -43,6 +43,7 @@ export default async function ThankYouPage({ searchParams }: PageProps) {
             id: true,
             createdAt: true,
             status: true,
+            publicTrackingCode: true,
             selectedArea: { select: { name: true, nameBn: true } },
           },
         })
@@ -92,7 +93,11 @@ export default async function ThankYouPage({ searchParams }: PageProps) {
             <span className="font-semibold">{leadStatusLabelBn(lead.status)}</span>
           </p>
           <Link
-            href={`/track?leadId=${lead.id}`}
+            href={
+              lead.publicTrackingCode
+                ? `/track/${encodeURIComponent(lead.publicTrackingCode)}`
+                : `/track?leadId=${lead.id}`
+            }
             className="mt-3 inline-block text-sm font-semibold text-q-primary underline"
           >
             ট্র্যাকিং পেজে দেখুন →
