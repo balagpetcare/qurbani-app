@@ -49,3 +49,6 @@ ALTER TABLE "PublicCaseHistory" ADD CONSTRAINT "PublicCaseHistory_sourceCaseRepo
 ALTER TABLE "PublicCaseHistory" ADD CONSTRAINT "PublicCaseHistory_authorDoctorUserId_fkey" FOREIGN KEY ("authorDoctorUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "PublicCaseHistory" ADD CONSTRAINT "PublicCaseHistory_reviewedByUserId_fkey" FOREIGN KEY ("reviewedByUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Prisma @updatedAt: no DB default (same ordering fix as tutorial_moderation_mvp).
+ALTER TABLE "PublicCaseHistory" ALTER COLUMN "updatedAt" DROP DEFAULT;

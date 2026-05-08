@@ -1,20 +1,8 @@
--- AlterEnum
-ALTER TYPE "LeadStatus" ADD VALUE 'FOLLOW_UP_NEEDED';
+-- Re-append FOLLOW_UP_NEEDED: 20260506200000 recreated "LeadStatus" without this label
+-- (20260506090341 added it to the pre-rename enum, which was then dropped).
+ALTER TYPE "LeadStatus" ADD VALUE IF NOT EXISTS 'FOLLOW_UP_NEEDED';
 
--- DropForeignKey
-ALTER TABLE "Lead" DROP CONSTRAINT "Lead_areaId_fkey";
+-- Relax Area FK to match nullable Lead.areaId + Prisma (SET NULL when Area row is removed).
+ALTER TABLE "Lead" DROP CONSTRAINT IF EXISTS "Lead_areaId_fkey";
 
--- AlterTable
-ALTER TABLE "ContentReport" ALTER COLUMN "updatedAt" DROP DEFAULT;
-
--- AlterTable
-ALTER TABLE "PublicCaseHistory" ALTER COLUMN "updatedAt" DROP DEFAULT;
-
--- AlterTable
-ALTER TABLE "Tutorial" ALTER COLUMN "updatedAt" DROP DEFAULT;
-
--- AlterTable
-ALTER TABLE "TutorialRevision" ALTER COLUMN "updatedAt" DROP DEFAULT;
-
--- AddForeignKey
 ALTER TABLE "Lead" ADD CONSTRAINT "Lead_areaId_fkey" FOREIGN KEY ("areaId") REFERENCES "Area"("id") ON DELETE SET NULL ON UPDATE CASCADE;

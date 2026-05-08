@@ -108,3 +108,8 @@ CREATE INDEX "UserBlock_blockedUserId_idx" ON "UserBlock"("blockedUserId");
 ALTER TABLE "UserBlock" ADD CONSTRAINT "UserBlock_blockerUserId_fkey" FOREIGN KEY ("blockerUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "UserBlock" ADD CONSTRAINT "UserBlock_blockedUserId_fkey" FOREIGN KEY ("blockedUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Prisma @updatedAt: no DB default (was incorrectly altered in an earlier migration before these tables existed).
+ALTER TABLE "Tutorial" ALTER COLUMN "updatedAt" DROP DEFAULT;
+ALTER TABLE "TutorialRevision" ALTER COLUMN "updatedAt" DROP DEFAULT;
+ALTER TABLE "ContentReport" ALTER COLUMN "updatedAt" DROP DEFAULT;
