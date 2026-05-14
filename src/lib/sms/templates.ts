@@ -1,5 +1,5 @@
-import { getPublicAppUrl, getSmsBrandName } from "@/lib/server/sms/sms-env";
-import { maskPhoneForLog } from "@/lib/ops-log";
+import { formatPhoneForDisplay, normalizeBangladeshPhone } from "@/lib/phone";
+import { getSmsBrandName } from "@/lib/server/sms/sms-env";
 
 function clampPlainText(s: string, max: number): string {
   const t = s.replace(/\s+/g, " ").trim();
@@ -47,15 +47,19 @@ export function buildOfficeLeadAlertSms(input: {
   problemPreview?: string;
   trackingUrl?: string;
 }): string {
-  const base = getPublicAppUrl().replace(/\/$/, "");
-  const adminPath = "/admin/leads";
-  const adminUrl = base ? `${base}${adminPath}` : adminPath;
+  const name = clampPlainText(input.customerName?.trim() || "—", 80);
   const area = clampPlainText(input.areaLabel, 80);
-  const masked = maskPhoneForLog(input.customerPhone);
-  return clampPlainText(
-    `New veterinary lead #${input.leadId}. Area: ${area}. Phone: ${masked}. Open admin panel: ${adminUrl}`,
-    470,
-  );
+  const local = normalizeBangladeshPhone(input.customerPhone);
+  const phoneLine = local
+    ? formatPhoneForDisplay(input.customerPhone)
+    : input.customerPhone.replace(/\s+/g, " ").trim() || "—";
+  const lines = [
+    `Lead: #${input.leadId}`,
+    `Name: ${name}`,
+    `Phone: ${phoneLine}`,
+    `Area: ${area}`,
+  ];
+  return clampPlainText(lines.join("\n"), 470);
 }
 
 /** @deprecated Use {@link buildOfficeLeadAlertSms} — kept as alias for imports. */
