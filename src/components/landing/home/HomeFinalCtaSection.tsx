@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { TrackedOutboundAnchor } from "@/components/analytics/TrackedOutboundAnchor";
 import {
   landingBtnPrimaryOnDark,
   landingBtnSecondaryOnDark,
@@ -31,9 +32,13 @@ export function HomeFinalCtaSection({ lp }: Props) {
               অনুরোধ ফর্ম সাময়িক বন্ধ
             </span>
           )}
-          <a href={telEmergency} className={`min-h-[48px] sm:max-w-[14rem] ${landingBtnSecondaryOnDark}`}>
+          <TrackedOutboundAnchor
+            href={telEmergency}
+            tracking="tel"
+            className={`min-h-[48px] sm:max-w-[14rem] ${landingBtnSecondaryOnDark}`}
+          >
             জরুরি কল
-          </a>
+          </TrackedOutboundAnchor>
         </div>
       </div>
     </section>

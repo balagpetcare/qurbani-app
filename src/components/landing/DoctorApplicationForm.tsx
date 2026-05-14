@@ -4,6 +4,10 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { SearchableAreaMultiSelect } from "@/components/forms/SearchableAreaMultiSelect";
 import {
+  buildGoogleAdsSendTo,
+  trackGoogleAdsConversion,
+} from "@/lib/analytics/googleAds";
+import {
   BD_PHONE_INVALID_MSG_BN,
   BD_WHATSAPP_INVALID_MSG_BN,
 } from "@/lib/phone";
@@ -99,10 +103,21 @@ export function DoctorApplicationForm() {
         return;
       }
 
+      const newRefId = data.application?.id ?? null;
       form.reset();
       setAreaIds([]);
+      const doctorApplyLabel =
+        process.env.NEXT_PUBLIC_GOOGLE_ADS_CONV_LABEL_DOCTOR_APPLY?.trim();
+      if (doctorApplyLabel) {
+        trackGoogleAdsConversion(
+          buildGoogleAdsSendTo(doctorApplyLabel),
+          newRefId != null
+            ? { transaction_id: `doctor-apply-${newRefId}` }
+            : undefined,
+        );
+      }
       setSuccess(true);
-      setRefId(data.application?.id ?? null);
+      setRefId(newRefId);
     } catch {
       setError("নেটওয়ার্ক ত্রুটি। আবার চেষ্টা করুন।");
     } finally {

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Noto_Sans_Bengali } from "next/font/google";
+
+import { GoogleAdsRootScripts } from "@/components/analytics/GoogleAdsRootScripts";
 import "./globals.css";
 
 const appSans = Noto_Sans_Bengali({
@@ -69,7 +71,10 @@ export default function RootLayout({
       lang="bn"
       className={`${appSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-[100dvh] min-w-0 flex-col">{children}</body>
+      <body className="flex min-h-[100dvh] min-w-0 flex-col">
+        <GoogleAdsRootScripts />
+        {children}
+      </body>
     </html>
   );
 }

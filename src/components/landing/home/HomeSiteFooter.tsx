@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { TrackedOutboundAnchor } from "@/components/analytics/TrackedOutboundAnchor";
 import { landingTelHref, landingWhatsAppHref } from "@/components/landing/landing-contact";
 import type { LandingAreaChip } from "@/lib/landing-public-data";
 import type { LandingPublicPayload } from "@/lib/site-settings";
@@ -29,21 +30,35 @@ export function HomeSiteFooter({ lp, areas }: Props) {
           <div className="mt-3 space-y-1.5 text-sm">
             <p>
               <span className="text-zinc-500">হটলাইন: </span>
-              <a href={telMain} className="font-semibold text-q-primary underline">
+              <TrackedOutboundAnchor
+                href={telMain}
+                tracking="tel"
+                className="font-semibold text-q-primary underline"
+              >
                 {landingCallNumberDisplay(lp.phoneCallDigits)}
-              </a>
+              </TrackedOutboundAnchor>
             </p>
             <p>
               <span className="text-zinc-500">জরুরি: </span>
-              <a href={telEmergency} className="font-semibold text-q-primary underline">
+              <TrackedOutboundAnchor
+                href={telEmergency}
+                tracking="tel"
+                className="font-semibold text-q-primary underline"
+              >
                 {landingCallNumberDisplay(lp.emergencyDigits)}
-              </a>
+              </TrackedOutboundAnchor>
             </p>
             <p>
               <span className="text-zinc-500">WhatsApp: </span>
-              <a href={waHref} className="font-semibold text-q-primary underline" target="_blank" rel="noreferrer">
+              <TrackedOutboundAnchor
+                href={waHref}
+                tracking="whatsapp"
+                className="font-semibold text-q-primary underline"
+                target="_blank"
+                rel="noreferrer"
+              >
                 {landingWhatsAppNumberDisplay(lp.whatsappDigits)}
-              </a>
+              </TrackedOutboundAnchor>
             </p>
           </div>
         </div>

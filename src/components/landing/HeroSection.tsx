@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { TrackedOutboundAnchor } from "@/components/analytics/TrackedOutboundAnchor";
 import {
   landingBtnHelpline,
   landingBtnPrimary,
@@ -85,17 +86,22 @@ export function HeroSection({
         </div>
 
         <div className="mx-auto mt-6 flex w-full min-w-0 max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center sm:gap-4">
-          <a href={telHref} className={`touch-manipulation ${landingBtnHelpline}`}>
+          <TrackedOutboundAnchor
+            href={telHref}
+            tracking="tel"
+            className={`touch-manipulation ${landingBtnHelpline}`}
+          >
             হেল্পলাইনে কল করুন
-          </a>
-          <a
+          </TrackedOutboundAnchor>
+          <TrackedOutboundAnchor
             href={waHref}
+            tracking="whatsapp"
             target="_blank"
             rel="noopener noreferrer"
             className={`touch-manipulation ${landingBtnWhatsapp}`}
           >
             WhatsApp সহায়তা
-          </a>
+          </TrackedOutboundAnchor>
         </div>
         <p className="mx-auto mt-5 max-w-xl px-1 text-sm leading-relaxed text-zinc-600 sm:text-base">
           ডাক্তারের ব্যক্তিগত নম্বর বা ইমেইল এখানে দেখানো হয় না। ফর্ম পূরণ করলে নির্ধারিতভাবে যোগাযোগ করা

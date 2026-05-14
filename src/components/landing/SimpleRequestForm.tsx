@@ -29,7 +29,9 @@ import {
   RequestFormField,
   validateRequestForm,
 } from "@/lib/request-form-validation";
+import { trackLeadSubmit } from "@/lib/analytics/googleAds";
 import { utmPayloadFromSearchParams } from "@/lib/utm-from-search";
+import { TrackedOutboundAnchor } from "@/components/analytics/TrackedOutboundAnchor";
 
 const FORM_ID = "qurbani-request-form";
 
@@ -305,6 +307,14 @@ export function SimpleRequestForm({
           ? data.trackingCode.trim()
           : undefined,
       );
+      trackLeadSubmit({
+        transaction_id:
+          typeof data.trackingCode === "string" && data.trackingCode.trim()
+            ? data.trackingCode.trim()
+            : typeof data.id === "number"
+              ? `lead-${data.id}`
+              : undefined,
+      });
       setSuccessDialogOpen(true);
     } catch {
       setNetworkDialogOpen(true);
@@ -371,20 +381,22 @@ export function SimpleRequestForm({
             কল বা WhatsApp করে যোগাযোগ করুন।
           </p>
           <div className="mx-auto mt-4 grid grid-cols-2 gap-2">
-            <a
+            <TrackedOutboundAnchor
               href={telHref}
+              tracking="tel"
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-emerald-700 text-sm font-bold text-white"
             >
               কল
-            </a>
-            <a
+            </TrackedOutboundAnchor>
+            <TrackedOutboundAnchor
               href={waHref}
+              tracking="whatsapp"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-700 bg-white text-sm font-bold text-emerald-900"
             >
               WhatsApp
-            </a>
+            </TrackedOutboundAnchor>
           </div>
           <p className="mt-4">
             <Link
@@ -438,20 +450,22 @@ export function SimpleRequestForm({
         onSecondary={() => setNetworkDialogOpen(false)}
         footerExtra={
           <div className="grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
-            <a
+            <TrackedOutboundAnchor
               href={telHref}
+              tracking="tel"
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-zinc-900 text-sm font-semibold text-white"
             >
               কল
-            </a>
-            <a
+            </TrackedOutboundAnchor>
+            <TrackedOutboundAnchor
               href={waHref}
+              tracking="whatsapp"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-600 bg-white text-sm font-semibold text-emerald-900"
             >
               WhatsApp
-            </a>
+            </TrackedOutboundAnchor>
           </div>
         }
       >
@@ -470,20 +484,22 @@ export function SimpleRequestForm({
         onPrimary={() => setServerDialogOpen(false)}
         footerExtra={
           <div className="grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
-            <a
+            <TrackedOutboundAnchor
               href={telHref}
+              tracking="tel"
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-emerald-600 text-sm font-semibold text-white"
             >
               কল
-            </a>
-            <a
+            </TrackedOutboundAnchor>
+            <TrackedOutboundAnchor
               href={waHref}
+              tracking="whatsapp"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-600 bg-white text-sm font-semibold text-emerald-900"
             >
               WhatsApp
-            </a>
+            </TrackedOutboundAnchor>
           </div>
         }
       >
@@ -495,20 +511,22 @@ export function SimpleRequestForm({
         aria-label="ভেটেরিনারি অনুরোধ ফর্ম"
       >
         <div className="mb-3 flex gap-2 rounded-2xl border border-emerald-100/80 bg-emerald-50/60 p-2">
-          <a
+          <TrackedOutboundAnchor
             href={telHref}
+            tracking="tel"
             className="flex flex-1 items-center justify-center rounded-xl bg-emerald-700 py-2.5 text-xs font-bold text-white shadow-sm"
           >
             জরুরি কল
-          </a>
-          <a
+          </TrackedOutboundAnchor>
+          <TrackedOutboundAnchor
             href={waHref}
+            tracking="whatsapp"
             target="_blank"
             rel="noopener noreferrer"
             className="flex flex-1 items-center justify-center rounded-xl border border-emerald-700 bg-white py-2.5 text-xs font-bold text-emerald-900"
           >
             WhatsApp
-          </a>
+          </TrackedOutboundAnchor>
         </div>
 
         <form

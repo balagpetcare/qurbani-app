@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { TrackedOutboundAnchor } from "@/components/analytics/TrackedOutboundAnchor";
+
 import { landingTelHref, landingWhatsAppHref, LANDING_REQUEST_PATH } from "./landing-contact";
 
 type Props = {
@@ -42,20 +44,22 @@ export function TrustSection({ phoneDigits, whatsAppDigits, leadFormEnabled }: P
           ))}
         </ul>
         <div className="mx-auto mt-8 flex max-w-xl flex-col gap-3 sm:flex-row sm:justify-center">
-          <a
+          <TrackedOutboundAnchor
             href={telHref}
+            tracking="tel"
             className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-700"
           >
             কল করুন
-          </a>
-          <a
+          </TrackedOutboundAnchor>
+          <TrackedOutboundAnchor
             href={waHref}
+            tracking="whatsapp"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border-2 border-emerald-600 bg-white px-5 py-3 text-center text-sm font-semibold text-emerald-900 hover:bg-emerald-50"
           >
             WhatsApp করুন
-          </a>
+          </TrackedOutboundAnchor>
           {leadFormEnabled ? (
             <Link
               href={LANDING_REQUEST_PATH}

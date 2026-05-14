@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { TrackedOutboundAnchor } from "@/components/analytics/TrackedOutboundAnchor";
 import {
   landingTelHref,
   landingWhatsAppHref,
@@ -32,20 +33,22 @@ export function StickyLandingCta({
           className="mx-auto flex w-full min-w-0 max-w-lg items-stretch justify-center gap-2 px-1"
           aria-label="দ্রুত যোগাযোগ"
         >
-          <a
+          <TrackedOutboundAnchor
             href={telHref}
+            tracking="tel"
             className="touch-manipulation flex min-h-[52px] min-w-0 flex-1 items-center justify-center break-words rounded-xl bg-emerald-600 px-2 text-center text-sm font-semibold leading-snug text-white active:bg-emerald-700"
           >
             কল
-          </a>
-          <a
+          </TrackedOutboundAnchor>
+          <TrackedOutboundAnchor
             href={waHref}
+            tracking="whatsapp"
             target="_blank"
             rel="noopener noreferrer"
             className="touch-manipulation flex min-h-[52px] min-w-0 flex-1 items-center justify-center break-words rounded-xl border-2 border-emerald-600 bg-white px-2 text-center text-sm font-semibold leading-snug text-emerald-900 active:bg-emerald-50"
           >
             WhatsApp
-          </a>
+          </TrackedOutboundAnchor>
           {leadFormEnabled ? (
             <Link
               href={LANDING_REQUEST_PATH}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { TrackedOutboundAnchor } from "@/components/analytics/TrackedOutboundAnchor";
 import {
   landingBtnOutlineEmerald,
   landingBtnSolidEmerald,
@@ -43,12 +44,13 @@ export function HomeQuickRequestCta({ lp }: Props) {
               অনলাইন অনুরোধ ফর্ম সাময়িক বন্ধ — জরুরি কল ব্যবহার করুন
             </span>
           )}
-          <a
+          <TrackedOutboundAnchor
             href={telEmergency}
+            tracking="tel"
             className={`min-h-[48px] flex-1 rounded-2xl text-[1.05rem] font-bold sm:max-w-xs ${landingBtnOutlineEmerald}`}
           >
             জরুরি কল
-          </a>
+          </TrackedOutboundAnchor>
         </div>
       </div>
     </section>

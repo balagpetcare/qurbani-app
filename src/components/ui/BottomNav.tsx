@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
+import { trackPhoneCallClick, trackWhatsAppClick } from "@/lib/analytics/googleAds";
+
 export type BottomNavItem = {
   href: string;
   label: string;
@@ -61,12 +63,17 @@ function NavInner({
     </>
   );
   if (href.startsWith("tel:") || href.startsWith("http")) {
+    const onOutboundClick = () => {
+      if (href.startsWith("tel:")) trackPhoneCallClick();
+      else if (href.includes("wa.me")) trackWhatsAppClick();
+    };
     return (
       <a
         href={href}
         className={cls}
         target={href.startsWith("http") ? "_blank" : undefined}
         rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+        onClick={onOutboundClick}
       >
         {inner}
       </a>

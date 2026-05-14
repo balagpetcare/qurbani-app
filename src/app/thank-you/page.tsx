@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { TrackedOutboundAnchor } from "@/components/analytics/TrackedOutboundAnchor";
+import { landingTelHref, landingWhatsAppHref } from "@/components/landing/landing-contact";
 import { AppCard } from "@/components/ui/AppCard";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { AppShell } from "@/components/ui/AppShell";
@@ -7,7 +9,6 @@ import { AppSuccessState } from "@/components/ui/AppSuccessState";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { leadStatusLabelBn } from "@/lib/lead-labels-bn";
 import { customerBottomNav } from "@/lib/customer-nav";
-import { landingTelHref, landingWhatsAppHref } from "@/components/landing/landing-contact";
 import { prisma } from "@/lib/prisma";
 import { getLandingPublicPayloadSafe } from "@/lib/site-settings";
 
@@ -110,20 +111,22 @@ export default async function ThankYouPage({ searchParams }: PageProps) {
       ) : null}
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <a
+        <TrackedOutboundAnchor
           href={telHref}
+          tracking="tel"
           className="inline-flex min-h-[var(--q-touch-min)] flex-1 items-center justify-center rounded-2xl bg-q-primary px-6 text-base font-bold text-white shadow-md touch-manipulation hover:bg-q-primary-deep"
         >
           এখনই কল করুন
-        </a>
-        <a
+        </TrackedOutboundAnchor>
+        <TrackedOutboundAnchor
           href={waHref}
+          tracking="whatsapp"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex min-h-[var(--q-touch-min)] flex-1 items-center justify-center rounded-2xl border-2 border-q-primary bg-white px-6 text-base font-bold text-q-primary-deep shadow-sm touch-manipulation hover:bg-q-primary-soft"
         >
           WhatsApp
-        </a>
+        </TrackedOutboundAnchor>
       </div>
 
       <div className="mt-10 text-center">
