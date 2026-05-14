@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { LeadStatus as LeadStatusType } from "@/generated/prisma/enums";
 import { LeadStatus, UserRole } from "@/generated/prisma/enums";
 import { requireAdminFromRequest } from "@/lib/auth-guards";
+import { leadCompletedAtForStatusTransition } from "@/lib/lead/lead-completed-at";
 import { prisma } from "@/lib/prisma";
 import {
   BD_PHONE_INVALID_MSG_BN,
@@ -98,6 +99,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     message?: string | null;
     status?: LeadStatusType;
     assignedDoctorId?: number | null;
+    leadCompletedAt?: Date;
   } = {};
 
   const name = asTrimmedString(body.customerName);
@@ -223,6 +225,17 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  }
+
+  if (data.status !== undefined) {
+    const completedAt = leadCompletedAtForStatusTransition(
+      existing.status,
+      data.status,
+      existing.leadCompletedAt,
+    );
+    if (completedAt !== undefined) {
+      data.leadCompletedAt = completedAt;
+    }
   }
 
   try {

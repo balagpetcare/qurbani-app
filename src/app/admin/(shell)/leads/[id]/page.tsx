@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AssignDoctorForm } from "@/components/admin/AssignDoctorForm";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { CopyWhatsAppLeadButton } from "@/components/admin/CopyWhatsAppLeadButton";
 import { LeadNoteForm } from "@/components/admin/LeadNoteForm";
 import { LeadPriorityBadge } from "@/components/admin/LeadPriorityBadge";
 import { LeadStatusBadge } from "@/components/admin/LeadStatusBadge";
@@ -90,6 +91,13 @@ export default async function AdminLeadDetailPage({ params }: PageProps) {
       },
       notes: {
         orderBy: { createdAt: "desc" },
+      },
+      whatsappCopyLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          admin: { select: { id: true, name: true } },
+        },
       },
       caseReport: true,
       statusHistory: {
@@ -221,6 +229,75 @@ export default async function AdminLeadDetailPage({ params }: PageProps) {
               তালিকায় ফিরুন
             </Link>
           </div>
+
+          <AdminDetailSection
+            title="WhatsApp গ্রুপ ডিসপ্যাচ"
+            subtitle="গ্রুপে শুধু মাস্ক করা নম্বর ও নিরাপদ গ্রহণ লিংক পাঠান। সম্পূর্ণ নম্বর শুধু গ্রহণকারী ডাক্তার দেখতে পারবেন।"
+          >
+            <CopyWhatsAppLeadButton leadId={lead.id} />
+            <dl className="mt-6 grid gap-2 text-sm text-zinc-600">
+              <div className="flex justify-between gap-4">
+                <dt>প্রথম কপি</dt>
+                <dd className="text-right text-zinc-900">
+                  {lead.whatsappCopiedAt
+                    ? formatDateTime(lead.whatsappCopiedAt)
+                    : "—"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>লিংক প্রথম খোলা</dt>
+                <dd className="text-right text-zinc-900">
+                  {lead.acceptanceLinkOpenedAt
+                    ? formatDateTime(lead.acceptanceLinkOpenedAt)
+                    : "—"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>ডাক্তার গ্রহণ</dt>
+                <dd className="text-right text-zinc-900">
+                  {lead.acceptedAt ? formatDateTime(lead.acceptedAt) : "—"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>সমাপ্তি (স্ট্যাটাস)</dt>
+                <dd className="text-right text-zinc-900">
+                  {lead.leadCompletedAt
+                    ? formatDateTime(lead.leadCompletedAt)
+                    : "—"}
+                </dd>
+              </div>
+            </dl>
+            <div className="mt-6 border-t border-zinc-100 pt-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                কপি লগ
+              </h3>
+              {lead.whatsappCopyLogs.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-600">এখনও কোনো কপি রেকর্ড নেই।</p>
+              ) : (
+                <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto text-sm">
+                  {lead.whatsappCopyLogs.map((row) => (
+                    <li
+                      key={row.id}
+                      className="rounded-lg border border-zinc-100 bg-zinc-50/80 px-3 py-2"
+                    >
+                      <span className="font-medium text-zinc-900">
+                        {row.admin.name}
+                      </span>
+                      <span className="text-zinc-500">
+                        {" "}
+                        · {formatDateTime(row.createdAt)}
+                      </span>
+                      {row.ipAddress ? (
+                        <span className="mt-1 block font-mono text-xs text-zinc-500">
+                          IP {row.ipAddress}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </AdminDetailSection>
 
           <AdminDetailSection title="গ্রাহক">
             <dl className="grid gap-3 sm:grid-cols-2 sm:gap-4">

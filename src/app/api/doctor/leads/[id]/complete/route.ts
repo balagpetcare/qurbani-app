@@ -19,6 +19,7 @@ import {
 } from "@/lib/billing-calculations";
 import { doctorCanAccessLead } from "@/lib/doctor-lead-access";
 import { appendLeadStatusHistory, isLeadStatusTerminal } from "@/lib/lead-workflow";
+import { leadCompletedAtForStatusTransition } from "@/lib/lead/lead-completed-at";
 import { logOps } from "@/lib/ops-log";
 import { prisma } from "@/lib/prisma";
 import {
@@ -256,6 +257,7 @@ export async function POST(request: Request, context: RouteContext) {
         priority: true,
         caseReport: true,
         caseBilling: true,
+        leadCompletedAt: true,
       },
     });
     if (!lead) {
@@ -354,9 +356,19 @@ export async function POST(request: Request, context: RouteContext) {
         },
       });
 
+      const completedStamp = leadCompletedAtForStatusTransition(
+        lead.status,
+        nextLeadStatus,
+        lead.leadCompletedAt,
+      );
       await tx.lead.update({
         where: { id },
-        data: { status: nextLeadStatus },
+        data: {
+          status: nextLeadStatus,
+          ...(completedStamp !== undefined
+            ? { leadCompletedAt: completedStamp }
+            : {}),
+        },
       });
 
       await appendLeadStatusHistory(tx, {

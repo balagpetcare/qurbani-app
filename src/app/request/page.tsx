@@ -19,9 +19,9 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   const p = await getLandingPublicPayloadSafe();
   return {
-    title: `অনুরোধ · ${p.publicSiteTitle}`,
+    title: `ভেটেরিনারি সহায়তা · ${p.publicSiteTitle}`,
     description:
-      "কুরবানি পশুর জন্য দ্রুত ভেটেরিনারি সহায়তা — সংক্ষিপ্ত অনুরোধ ফর্ম।",
+      "অল্প তথ্যে ভেটেরিনারি সহায়তার অনুরোধ — দ্রুত ও নিরাপদ।",
   };
 }
 
@@ -57,10 +57,12 @@ export default async function RequestPage({
       variant="customer"
       header={
         <AppHeader
-          title="চিকিৎসার অনুরোধ"
-          subtitle={lp.publicSiteTitle}
+          title="ভেটেরিনারি সহায়তা"
+          subtitle="অল্প তথ্য দিন — ডাক্তার দ্রুত যোগাযোগ করবেন"
           backHref="/"
+          backLabel="হোম"
           variant="gradient"
+          stackedTitleRow
           actions={
             <Link
               href="/doctors"

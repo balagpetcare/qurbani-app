@@ -35,3 +35,34 @@ export function getBulkSmsBaseUrl(): string {
     process.env.BULKSMSBD_BASE_URL?.trim() || "http://bulksmsbd.net/api"
   ).replace(/\/$/, "");
 }
+
+/** Primary SMS API POST URL (BulkSMSBD-compatible form POST). */
+export function getSmsPostUrl(): string {
+  const custom = process.env.SMS_API_URL?.trim();
+  if (custom) return custom.replace(/\/$/, "");
+  return `${getBulkSmsBaseUrl()}/smsapi`;
+}
+
+export function getSmsApiKey(): string {
+  return (process.env.SMS_API_KEY ?? process.env.BULKSMSBD_API_KEY ?? "").trim();
+}
+
+export function getSmsSenderId(): string {
+  return (
+    process.env.SMS_SENDER_ID ?? process.env.BULKSMSBD_SENDER_ID ?? ""
+  ).trim();
+}
+
+/** Office line for new public lead alerts (falls back to legacy admin env). */
+export function getOfficeLeadNotifyPhone(): string {
+  return (
+    process.env.OFFICIAL_LEAD_RECEIVE_PHONE?.trim() ||
+    process.env.ADMIN_SMS_ALERT_PHONE?.trim() ||
+    ""
+  );
+}
+
+/** Shown in customer confirmation SMS (e.g. 01711XXXXXX). */
+export function getCustomerSupportPhoneDisplay(): string {
+  return (process.env.CUSTOMER_SUPPORT_PHONE ?? "").trim();
+}

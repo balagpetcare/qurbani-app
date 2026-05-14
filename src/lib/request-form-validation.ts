@@ -26,12 +26,12 @@ export const REQUEST_FIELD_IDS: Record<RequestFormField, string> = {
 export const REQUEST_FIELD_ORDER: RequestFormField[] = [
   "customerName",
   "phone",
-  "whatsapp",
   "areaId",
   "customArea",
   "animalKind",
   "animalTypeOther",
   "problemSummary",
+  "whatsapp",
 ];
 
 export const MSG = {

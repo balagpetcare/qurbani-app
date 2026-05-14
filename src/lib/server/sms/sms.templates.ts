@@ -1,4 +1,11 @@
+import { formatPhoneForDisplay } from "@/lib/phone";
 import { getSmsBrandName } from "@/lib/server/sms/sms-env";
+
+function clampPlainText(s: string, max: number): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, Math.max(0, max - 1))}…`;
+}
 
 export function buildOtpSmsBody(plainCode: string): string {
   const brand = getSmsBrandName();
@@ -7,6 +14,57 @@ export function buildOtpSmsBody(plainCode: string): string {
 
 export function buildLeadTrackingSms(trackingUrl: string): string {
   return `Quarbani 2026: আপনার চিকিৎসা রিকোয়েস্ট গ্রহণ করা হয়েছে। ট্র্যাক করুন: ${trackingUrl}`;
+}
+
+export function buildLeadIntakeCustomerConfirmationSms(input: {
+  supportDisplayPhone: string;
+  trackingUrl: string;
+}): string {
+  const brand = getSmsBrandName();
+  const lines = [
+    "আপনার অনুরোধটি গ্রহণ করা হয়েছে।",
+    "একজন ডাক্তার খুব দ্রুত আপনার সাথে যোগাযোগ করবেন।",
+    "",
+  ];
+  const support = input.supportDisplayPhone.trim();
+  if (support) {
+    lines.push("প্রয়োজনে কল করুন:");
+    lines.push(support);
+    lines.push("");
+  }
+  lines.push(`— ${brand} Veterinary Support`);
+  const track = input.trackingUrl.trim();
+  if (track.startsWith("http")) {
+    lines.push("");
+    lines.push(`অগ্রগতি দেখুন: ${track}`);
+  }
+  return clampPlainText(lines.join("\n"), 480);
+}
+
+export function buildLeadIntakeOfficeSms(input: {
+  leadId: number;
+  customerName: string;
+  customerPhone: string;
+  areaLabel: string;
+  animalLabel: string;
+  problemPreview: string;
+  trackingUrl: string;
+}): string {
+  const phoneDisplay = formatPhoneForDisplay(input.customerPhone);
+  const prob = clampPlainText(input.problemPreview, 220);
+  const lines = [
+    `নতুন ভেটেরিনারি অনুরোধ #${input.leadId}`,
+    `নাম: ${clampPlainText(input.customerName, 80)}`,
+    `মোবাইল: ${phoneDisplay}`,
+    `এলাকা: ${clampPlainText(input.areaLabel, 80)}`,
+    `পশু: ${clampPlainText(input.animalLabel, 80)}`,
+    `সমস্যা: ${prob || "—"}`,
+  ];
+  const track = input.trackingUrl.trim();
+  if (track.startsWith("http")) {
+    lines.push(`ট্র্যাক: ${track}`);
+  }
+  return clampPlainText(lines.join("\n"), 470);
 }
 
 export function buildDoctorNewLeadSms(areaName: string, leadUrl: string): string {

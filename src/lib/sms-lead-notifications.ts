@@ -2,14 +2,21 @@ import { randomBytes } from "crypto";
 
 import { LeadStatus, UserRole } from "@/generated/prisma/enums";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { formatLeadAnimalDisplay } from "@/lib/lead-display";
 import { prisma } from "@/lib/prisma";
 import {
   buildCustomerLeadAcceptedSms,
   buildDoctorNewLeadSms,
-  buildLeadTrackingSms,
+  buildLeadIntakeCustomerConfirmationSms,
+  buildLeadIntakeOfficeSms,
   customerStatusSmsBody,
 } from "@/lib/server/sms/sms.templates";
-import { getPublicAppUrl } from "@/lib/server/sms/sms-env";
+import {
+  getCustomerSupportPhoneDisplay,
+  getOfficeLeadNotifyPhone,
+  getPublicAppUrl,
+} from "@/lib/server/sms/sms-env";
+import { sendSmsWithRetry } from "@/lib/server/sms/send-sms-with-retry";
 import { sendSms } from "@/lib/server/sms/sms.service";
 import { SMS_PURPOSE } from "@/lib/server/sms/sms.types";
 import { normalizeBdPhone } from "@/lib/server/sms/bulksmsbd";
@@ -61,8 +68,10 @@ function doctorLeadUrl(leadId: number): string {
 /** Customer SMS after intake + doctor/admin alerts. Failures are logged only. */
 export async function notifyLeadCreatedSms(leadId: number): Promise<{
   customer: "sent" | "failed" | "skipped";
+  office: "sent" | "failed" | "skipped";
 }> {
   let customerStatus: "sent" | "failed" | "skipped" = "skipped";
+  let officeStatus: "sent" | "failed" | "skipped" = "skipped";
 
   try {
     const lead = await prisma.lead.findUnique({
@@ -71,21 +80,25 @@ export async function notifyLeadCreatedSms(leadId: number): Promise<{
         selectedArea: { select: { nameBn: true, name: true } },
       },
     });
-    if (!lead) return { customer: "skipped" };
+    if (!lead) return { customer: "skipped", office: "skipped" };
 
     const code = await ensureLeadTrackingCode(prisma, lead.id);
     const trackingUrl = leadPublicUrl(code);
-    const msg = buildLeadTrackingSms(trackingUrl);
+    const supportDisplay = getCustomerSupportPhoneDisplay();
+    const confirmMsg = buildLeadIntakeCustomerConfirmationSms({
+      supportDisplayPhone: supportDisplay,
+      trackingUrl,
+    });
 
-    const r = await sendSms({
+    const cr = await sendSmsWithRetry({
       to: lead.phone,
-      message: msg,
-      purpose: SMS_PURPOSE.LEAD_TRACKING,
+      message: confirmMsg,
+      purpose: SMS_PURPOSE.LEAD_CUSTOMER_INTAKE_CONFIRM,
       leadId: lead.id,
     });
 
-    if (r.ok && r.status === "sent") customerStatus = "sent";
-    else if (!r.ok && r.status === "failed") customerStatus = "failed";
+    if (cr.ok && cr.status === "sent") customerStatus = "sent";
+    else if (!cr.ok && cr.status === "failed") customerStatus = "failed";
     else customerStatus = "skipped";
 
     const areaLabel =
@@ -93,6 +106,33 @@ export async function notifyLeadCreatedSms(leadId: number): Promise<{
       lead.selectedArea?.name?.trim() ||
       lead.area?.trim() ||
       "—";
+
+    const officeNotifyPhone = getOfficeLeadNotifyPhone();
+    if (officeNotifyPhone) {
+      const normOffice = normalizeBdPhone(officeNotifyPhone);
+      if (normOffice.ok) {
+        const animalLabel =
+          formatLeadAnimalDisplay(lead.animalKind, lead.animalType) || "—";
+        const officeMsg = buildLeadIntakeOfficeSms({
+          leadId: lead.id,
+          customerName: lead.customerName,
+          customerPhone: lead.phone,
+          areaLabel,
+          animalLabel,
+          problemPreview: lead.serviceRequirement,
+          trackingUrl,
+        });
+        const or = await sendSmsWithRetry({
+          to: normOffice.international880,
+          message: officeMsg,
+          purpose: SMS_PURPOSE.LEAD_OFFICE_INTAKE,
+          leadId: lead.id,
+        });
+        if (or.ok && or.status === "sent") officeStatus = "sent";
+        else if (!or.ok && or.status === "failed") officeStatus = "failed";
+        else officeStatus = "skipped";
+      }
+    }
 
     if (lead.areaId !== null) {
       const doctors = await prisma.user.findMany({
@@ -120,25 +160,11 @@ export async function notifyLeadCreatedSms(leadId: number): Promise<{
         }).catch((e) => console.error("[sms] doctor new lead", e));
       }
     }
-
-    const adminDigits = process.env.ADMIN_SMS_ALERT_PHONE?.trim();
-    if (adminDigits) {
-      const norm = normalizeBdPhone(adminDigits);
-      if (norm.ok) {
-        const adminMsg = buildDoctorNewLeadSms(areaLabel, doctorLeadUrl(lead.id));
-        void sendSms({
-          to: norm.international880,
-          message: adminMsg,
-          purpose: SMS_PURPOSE.ADMIN_NEW_LEAD,
-          leadId: lead.id,
-        }).catch((e) => console.error("[sms] admin new lead", e));
-      }
-    }
   } catch (e) {
     console.error("[sms] notifyLeadCreatedSms", e);
   }
 
-  return { customer: customerStatus };
+  return { customer: customerStatus, office: officeStatus };
 }
 
 export async function notifyCustomerDoctorAcceptedSms(

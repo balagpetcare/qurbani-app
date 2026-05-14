@@ -16,6 +16,7 @@ import {
 } from "@/lib/phone";
 import { maskPhoneForLog, logOps } from "@/lib/ops-log";
 import { parsePublicLeadIntake } from "@/lib/public-lead-intake";
+import { ensureLeadAcceptanceToken } from "@/lib/lead/acceptance-token";
 import { prisma } from "@/lib/prisma";
 import { assertLeadSubmissionAllowed } from "@/lib/public-rate-limit";
 import { getPublicAppUrl } from "@/lib/server/sms/sms-env";
@@ -51,7 +52,6 @@ type LeadBody = {
   priority?: unknown;
   preferredContact?: unknown;
   googleMapUrl?: unknown;
-  mediaUrls?: unknown;
   preferredDate?: unknown;
   preferredTime?: unknown;
   serviceRequirement?: unknown;
@@ -364,6 +364,12 @@ export async function POST(request: Request) {
     });
 
     try {
+      await ensureLeadAcceptanceToken(prisma, lead.id);
+    } catch (tokenErr) {
+      console.error("POST /api/leads: acceptance token", tokenErr);
+    }
+
+    try {
       const emergency = lead.priority === LeadPriority.EMERGENCY;
       const urgent = lead.priority === LeadPriority.URGENT;
       const prefix = emergency
@@ -389,6 +395,16 @@ export async function POST(request: Request) {
       console.error("POST /api/leads: notification queue", notifyErr);
     }
 
+    let smsStatus: "sent" | "failed" | "skipped" = "skipped";
+    let officeSmsStatus: "sent" | "failed" | "skipped" = "skipped";
+    try {
+      const sm = await notifyLeadCreatedSms(lead.id);
+      smsStatus = sm.customer;
+      officeSmsStatus = sm.office;
+    } catch (smsErr) {
+      console.error("POST /api/leads: SMS bundle", smsErr);
+    }
+
     logOps("lead_submitted", {
       leadId: lead.id,
       priority: lead.priority,
@@ -396,15 +412,9 @@ export async function POST(request: Request) {
       possibleDuplicate: priorDuplicate ? true : false,
       phoneMasked: maskPhoneForLog(phone),
       emergency: lead.priority === LeadPriority.EMERGENCY,
+      smsCustomer: smsStatus,
+      smsOffice: officeSmsStatus,
     });
-
-    let smsStatus: "sent" | "failed" | "skipped" = "skipped";
-    try {
-      const sm = await notifyLeadCreatedSms(lead.id);
-      smsStatus = sm.customer;
-    } catch (smsErr) {
-      console.error("POST /api/leads: SMS bundle", smsErr);
-    }
 
     const base = getPublicAppUrl();
     const trackingUrl =
@@ -421,6 +431,7 @@ export async function POST(request: Request) {
         trackingCode: publicTrackingCode,
         trackingUrl,
         smsStatus,
+        officeSmsStatus,
       },
       { status: 201 },
     );

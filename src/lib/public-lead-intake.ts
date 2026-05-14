@@ -20,9 +20,6 @@ const MAX_LEN = {
   animalTypeOther: 200,
 } as const;
 
-const MEDIA_MAX_ITEMS = 5;
-const MEDIA_URL_MAX = 2048;
-
 const ANIMAL_KINDS = new Set<string>(Object.values(AnimalKindEnum));
 const PRIORITIES = new Set<string>(Object.values(LeadPriorityEnum));
 const CONTACT_PREFS = new Set<string>(Object.values(LeadContactPreferenceEnum));
@@ -98,44 +95,6 @@ export function parseProblemCategorySlug(v: unknown): string | undefined {
   return s;
 }
 
-function isAllowedMediaUrl(url: string): boolean {
-  const u = url.trim();
-  if (u.length === 0 || u.length > MEDIA_URL_MAX) return false;
-  try {
-    const parsed = new URL(u);
-    return parsed.protocol === "https:" || parsed.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Accepts JSON array of strings, or a single string with one URL per line.
- * Returns JSON.stringify(arr) or null. Next step: signed uploads + `LeadMedia` rows.
- */
-export function parseMediaUrlsField(v: unknown): string | null {
-  if (v === undefined || v === null) return null;
-  const out: string[] = [];
-
-  if (Array.isArray(v)) {
-    for (const item of v) {
-      if (typeof item !== "string") continue;
-      const t = item.trim();
-      if (t && isAllowedMediaUrl(t)) out.push(t);
-      if (out.length >= MEDIA_MAX_ITEMS) break;
-    }
-  } else if (typeof v === "string") {
-    const lines = v.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
-    for (const line of lines) {
-      if (isAllowedMediaUrl(line)) out.push(line);
-      if (out.length >= MEDIA_MAX_ITEMS) break;
-    }
-  }
-
-  if (out.length === 0) return null;
-  return JSON.stringify(out);
-}
-
 export function parsePublicLeadIntake(
   body: Record<string, unknown>,
 ): { ok: ParsedPublicLeadIntake } | { error: string } {
@@ -177,7 +136,7 @@ export function parsePublicLeadIntake(
     ? clampLen(googleMapUrlRaw, MAX_LEN.googleMapUrl)
     : undefined;
 
-  const mediaUrlsJson = parseMediaUrlsField(body.mediaUrls);
+  const mediaUrlsJson: string | null = null;
 
   if (animalKind === AnimalKindEnum.OTHER) {
     const other = asTrimmedString(body.animalTypeOther);

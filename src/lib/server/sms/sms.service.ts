@@ -5,7 +5,9 @@ import {
   postBulkSmsApi,
 } from "@/lib/server/sms/bulksmsbd";
 import {
+  getSmsApiKey,
   getSmsBrandName,
+  getSmsSenderId,
   isLegacyOtpSmsFlagOn,
   isOutboundSmsEnabled,
   isSmsDryRun,
@@ -18,10 +20,7 @@ import {
 import type { SendSmsSafeResult, SmsPurpose } from "@/lib/server/sms/sms.types";
 
 function hasBulkSmsCredentials(): boolean {
-  return Boolean(
-    process.env.BULKSMSBD_API_KEY?.trim() &&
-      process.env.BULKSMSBD_SENDER_ID?.trim(),
-  );
+  return Boolean(getSmsApiKey() && getSmsSenderId());
 }
 
 function smsAllowedForPurpose(purpose: SmsPurpose): boolean {
@@ -127,8 +126,8 @@ export async function sendSms(input: {
     };
   }
 
-  const apiKey = process.env.BULKSMSBD_API_KEY!.trim();
-  const senderId = process.env.BULKSMSBD_SENDER_ID!.trim();
+  const apiKey = getSmsApiKey();
+  const senderId = getSmsSenderId();
 
   const form = new URLSearchParams();
   form.set("api_key", apiKey);

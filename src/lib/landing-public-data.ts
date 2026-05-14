@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { LeadStatus, UserRole } from "@/generated/prisma/enums";
 
 import { prisma } from "@/lib/prisma";
+import { formatLeadAnimalDisplay, formatLeadProblemCategory } from "@/lib/lead-display";
 import {
   publicCustomerAreaOrderBy,
   publicCustomerAreaWhere,
@@ -32,7 +33,7 @@ const publicDoctorSelect = {
   feeNote: true,
   availableTimeText: true,
   doctorAreas: {
-    select: { area: { select: { name: true, nameBn: true } } },
+    select: { area: { select: { id: true, name: true, nameBn: true } } },
   },
 } satisfies Prisma.UserSelect;
 
@@ -52,7 +53,10 @@ export async function getLandingAreas(): Promise<LandingAreaChip[]> {
   });
 }
 
-export async function getDoctorPreviews(limit = 4): Promise<PublicDoctorCard[]> {
+export async function getDoctorPreviews(
+  limit = 4,
+  options?: { cardMode?: "preview" | "directory" },
+): Promise<PublicDoctorCard[]> {
   const doctors = await prisma.user.findMany({
     where: { role: UserRole.DOCTOR, isActive: true },
     take: limit,
@@ -77,6 +81,8 @@ export async function getDoctorPreviews(limit = 4): Promise<PublicDoctorCard[]> 
     completed.map((r) => [r.assignedDoctorId as number, r._count._all]),
   );
 
+  const mode = options?.cardMode ?? "preview";
+
   return doctors.map((d: PublicDoctorDbRow) =>
     toPublicDoctorCard(
       {
@@ -94,9 +100,72 @@ export async function getDoctorPreviews(limit = 4): Promise<PublicDoctorCard[]> 
         doctorAreas: d.doctorAreas,
       },
       byId.get(d.id) ?? 0,
-      { mode: "preview" },
+      { mode },
     ),
   );
+}
+
+/** Start of calendar day in Asia/Dhaka (for “today” counters). */
+export function startOfTodayDhaka(now = new Date()): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dhaka",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const y = parts.find((p) => p.type === "year")!.value;
+  const m = parts.find((p) => p.type === "month")!.value;
+  const day = parts.find((p) => p.type === "day")!.value;
+  return new Date(`${y}-${m}-${day}T00:00:00+06:00`);
+}
+
+/** Real metrics for landing trust blocks (extend / replace with analytics later). */
+export type LandingHomeStats = {
+  doctorCount: number;
+  activeTreatments: number;
+  todayRequests: number;
+  completedServices: number;
+  visitsScheduledToday: number;
+};
+
+const ACTIVE_TREATMENT_STATUSES: LeadStatus[] = [
+  LeadStatus.ASSIGNED,
+  LeadStatus.ACCEPTED,
+  LeadStatus.IN_PROGRESS,
+  LeadStatus.OBSERVED,
+  LeadStatus.FOLLOW_UP_NEEDED,
+];
+
+export async function getLandingHomeStats(): Promise<LandingHomeStats> {
+  const start = startOfTodayDhaka();
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
+  const [
+    doctorCount,
+    activeTreatments,
+    todayRequests,
+    completedServices,
+    visitsScheduledToday,
+  ] = await Promise.all([
+    prisma.user.count({ where: { role: UserRole.DOCTOR, isActive: true } }),
+    prisma.lead.count({ where: { status: { in: ACTIVE_TREATMENT_STATUSES } } }),
+    prisma.lead.count({ where: { createdAt: { gte: start } } }),
+    prisma.lead.count({ where: { status: LeadStatus.COMPLETED } }),
+    prisma.lead.count({
+      where: {
+        preferredDate: { gte: start, lt: end },
+        status: { notIn: [LeadStatus.CANCELLED] },
+      },
+    }),
+  ]);
+
+  return {
+    doctorCount,
+    activeTreatments,
+    todayRequests,
+    completedServices,
+    visitsScheduledToday,
+  };
 }
 
 /** Public directory listing — never selects phone/WhatsApp/email/password/notes. */
@@ -208,6 +277,10 @@ export type PublicShowcaseCase = {
   summary: string;
   areaLabel: string;
   whenLabel: string;
+  /** Assigned doctor display name when safe to show; otherwise null. */
+  doctorLabel?: string | null;
+  /** Short treatment context (species / problem), no customer PII. */
+  treatmentTypeLabel?: string | null;
 };
 
 export async function getPublicShowcaseCases(
@@ -228,6 +301,10 @@ export async function getPublicShowcaseCases(
       lead: {
         select: {
           selectedArea: { select: { nameBn: true, name: true } },
+          assignedDoctor: { select: { name: true } },
+          animalKind: true,
+          animalType: true,
+          problemCategory: true,
         },
       },
     },
@@ -235,18 +312,30 @@ export async function getPublicShowcaseCases(
 
   return rows
     .filter((r) => (r.showcaseSummary?.trim().length ?? 0) >= 10)
-    .map((r) => ({
-      title: r.showcaseTitle?.trim() || "সম্পন্ন কেস",
-      summary: r.showcaseSummary!.trim(),
-      areaLabel:
-        r.lead.selectedArea?.nameBn?.trim() ||
-        r.lead.selectedArea?.name?.trim() ||
-        "এলাকা",
-      whenLabel: r.completedAt
-        ? r.completedAt.toLocaleDateString("bn-BD", {
-            year: "numeric",
-            month: "short",
-          })
-        : "",
-    }));
+    .map((r) => {
+      const lead = r.lead;
+      const animal = formatLeadAnimalDisplay(lead.animalKind, lead.animalType);
+      const prob = formatLeadProblemCategory(lead.problemCategory);
+      const parts = [
+        animal !== "—" ? animal : null,
+        prob !== "—" ? prob : null,
+      ].filter(Boolean) as string[];
+      const treatmentTypeLabel = parts.length ? parts.join(" · ") : null;
+      return {
+        title: r.showcaseTitle?.trim() || "সম্পন্ন কেস",
+        summary: r.showcaseSummary!.trim(),
+        areaLabel:
+          lead.selectedArea?.nameBn?.trim() ||
+          lead.selectedArea?.name?.trim() ||
+          "এলাকা",
+        whenLabel: r.completedAt
+          ? r.completedAt.toLocaleDateString("bn-BD", {
+              year: "numeric",
+              month: "short",
+            })
+          : "",
+        doctorLabel: lead.assignedDoctor?.name?.trim() || null,
+        treatmentTypeLabel,
+      };
+    });
 }

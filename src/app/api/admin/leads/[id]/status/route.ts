@@ -4,6 +4,7 @@ import type { LeadStatus as LeadStatusType } from "@/generated/prisma/enums";
 import { LeadStatus } from "@/generated/prisma/enums";
 import { requireAdminFromRequest } from "@/lib/auth-guards";
 import { appendLeadStatusHistory } from "@/lib/lead-workflow";
+import { leadCompletedAtForStatusTransition } from "@/lib/lead/lead-completed-at";
 import { prisma } from "@/lib/prisma";
 import { notifyCustomerLeadStatusSms } from "@/lib/sms-lead-notifications";
 
@@ -57,9 +58,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const lead = await prisma.$transaction(async (tx) => {
+      const completedAt = leadCompletedAtForStatusTransition(
+        existing.status,
+        statusRaw as LeadStatusType,
+        existing.leadCompletedAt,
+      );
       const updated = await tx.lead.update({
         where: { id },
-        data: { status: statusRaw as LeadStatusType },
+        data: {
+          status: statusRaw as LeadStatusType,
+          ...(completedAt !== undefined ? { leadCompletedAt: completedAt } : {}),
+        },
         select: { id: true, status: true, updatedAt: true },
       });
 

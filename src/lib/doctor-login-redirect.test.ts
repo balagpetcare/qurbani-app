@@ -83,4 +83,8 @@ describe("resolveDoctorPostLoginHref", () => {
     expect(resolveDoctorPostLoginHref("/doctor/login?x=1")).toBe("/doctor");
     expect(resolveDoctorPostLoginHref("/doctor/apply")).toBe("/doctor");
   });
+
+  it("allows secure WhatsApp lead acceptance deep links", () => {
+    expect(resolveDoctorPostLoginHref("/accept-lead/abc123")).toBe("/accept-lead/abc123");
+  });
 });

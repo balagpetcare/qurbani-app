@@ -32,7 +32,14 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const cur = await tx.lead.findUnique({ where: { id } });
+      const cur = await tx.lead.findUnique({
+        where: { id },
+        select: {
+          status: true,
+          assignedDoctorId: true,
+          acceptedAt: true,
+        },
+      });
       if (!cur) return { kind: "not_found" as const };
       if (isLeadStatusTerminal(cur.status)) {
         return { kind: "bad_state" as const };
@@ -42,7 +49,10 @@ export async function POST(request: Request, context: RouteContext) {
         if (cur.status === LeadStatus.ASSIGNED) {
           await tx.lead.update({
             where: { id },
-            data: { status: LeadStatus.ACCEPTED },
+            data: {
+              status: LeadStatus.ACCEPTED,
+              acceptedAt: cur.acceptedAt ?? new Date(),
+            },
           });
           await appendLeadStatusHistory(tx, {
             leadId: id,
@@ -73,6 +83,7 @@ export async function POST(request: Request, context: RouteContext) {
           data: {
             assignedDoctorId: auth.user.id,
             status: LeadStatus.ACCEPTED,
+            acceptedAt: new Date(),
           },
         });
         if (upd.count === 0) {

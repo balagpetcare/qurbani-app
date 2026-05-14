@@ -308,6 +308,7 @@ model User {
   phoneVerifiedAt             DateTime?
   customerSocialLinks         CustomerSocialLink[]
   smsLogs                     SmsLog[]
+  leadWhatsappCopyLogs        LeadWhatsAppCopyLog[]   @relation("LeadWhatsappCopyActor")
 }
 
 /// Links a CUSTOMER user to a stable subject from Google / Facebook / Apple (no refresh tokens stored here).
@@ -433,6 +434,16 @@ model Lead {
   duplicateCopies     Lead[]      @relation("LeadDuplicateOf")
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
+  /// Opaque token for `/accept-lead/[token]` (WhatsApp dispatch); never sequential.
+  acceptanceToken          String?   @unique @db.VarChar(64)
+  /// First time admin generated/copied the WhatsApp dispatch message.
+  whatsappCopiedAt           DateTime?
+  /// First successful public preview load of the acceptance link.
+  acceptanceLinkOpenedAt     DateTime?
+  /// When a doctor first claimed the lead (pool or token flow).
+  acceptedAt                 DateTime?
+  /// Denormalized completion time when [status] becomes COMPLETED (first transition only).
+  leadCompletedAt            DateTime?
   notes               LeadNote[]
   notifications       Notification[]
   observations        LeadObservation[]
@@ -442,9 +453,24 @@ model Lead {
   statusHistory       LeadStatusHistory[]
   publicCaseHistory   PublicCaseHistory?
   smsLogs             SmsLog[]
+  whatsappCopyLogs    LeadWhatsAppCopyLog[]
 
   @@index([priority])
   @@index([phone, createdAt])
+}
+
+/// Audit trail when admin copies WhatsApp dispatch text (manual group broadcast).
+model LeadWhatsAppCopyLog {
+  id          String   @id @default(cuid())
+  leadId      Int
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  adminUserId Int
+  admin       User     @relation("LeadWhatsappCopyActor", fields: [adminUserId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  ipAddress   String?  @db.VarChar(45)
+  userAgent   String?  @db.VarChar(512)
+
+  @@index([leadId, createdAt])
 }
 
 /// Outbound SMS audit trail (BulkSMSBD); never stores API keys or full OTP body.

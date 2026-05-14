@@ -1,6 +1,6 @@
 import { normalizeBangladeshPhone } from "@/lib/phone";
 
-import { getBulkSmsBaseUrl } from "@/lib/server/sms/sms-env";
+import { getBulkSmsBaseUrl, getSmsApiKey, getSmsPostUrl } from "@/lib/server/sms/sms-env";
 
 /** Bangla-safe user-facing invalid mobile message. */
 export const BD_PHONE_INVALID_FOR_SMS_BN =
@@ -190,8 +190,8 @@ export async function postBulkSmsApi(form: URLSearchParams): Promise<{
   code: string;
   mapped: MappedProviderCode;
 }> {
-  const base = getBulkSmsBaseUrl();
-  const url = `${base}/smsapi`;
+  const base = getSmsPostUrl();
+  const url = base;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -214,7 +214,7 @@ export async function fetchSmsBalance(): Promise<{
   httpStatus: number;
   body: string;
 }> {
-  const key = process.env.BULKSMSBD_API_KEY?.trim();
+  const key = getSmsApiKey();
   if (!key) {
     return { ok: false, httpStatus: 0, body: "missing_api_key" };
   }
