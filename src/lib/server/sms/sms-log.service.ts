@@ -49,3 +49,21 @@ export async function finalizeSmsLog(
     },
   });
 }
+
+/** Block re-sends when the same lead + purpose + destination already reached SENT. */
+export async function hasSuccessfulLeadSmsDuplicate(input: {
+  leadId: number;
+  purpose: string;
+  normalizedPhone880: string;
+}): Promise<boolean> {
+  const row = await prisma.smsLog.findFirst({
+    where: {
+      leadId: input.leadId,
+      purpose: input.purpose,
+      normalizedPhone: input.normalizedPhone880,
+      status: SmsLogStatus.SENT,
+    },
+    select: { id: true },
+  });
+  return Boolean(row);
+}

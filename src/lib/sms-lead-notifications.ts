@@ -7,19 +7,20 @@ import { prisma } from "@/lib/prisma";
 import {
   buildCustomerLeadAcceptedSms,
   buildDoctorNewLeadSms,
-  buildLeadIntakeCustomerConfirmationSms,
-  buildLeadIntakeOfficeSms,
   customerStatusSmsBody,
 } from "@/lib/server/sms/sms.templates";
 import {
   getCustomerSupportPhoneDisplay,
-  getOfficeLeadNotifyPhone,
+  getOfficeLeadNotifyPhones,
   getPublicAppUrl,
 } from "@/lib/server/sms/sms-env";
-import { sendSmsWithRetry } from "@/lib/server/sms/send-sms-with-retry";
 import { sendSms } from "@/lib/server/sms/sms.service";
 import { SMS_PURPOSE } from "@/lib/server/sms/sms.types";
-import { normalizeBdPhone } from "@/lib/server/sms/bulksmsbd";
+import { sendCustomerLeadConfirmation, sendOfficeLeadAlert } from "@/lib/sms/send";
+import {
+  buildLeadIntakeCustomerConfirmationSms,
+  buildLeadIntakeOfficeSms,
+} from "@/lib/sms/templates";
 
 export function randomLeadTrackingCode(): string {
   return randomBytes(12)
@@ -90,11 +91,10 @@ export async function notifyLeadCreatedSms(leadId: number): Promise<{
       trackingUrl,
     });
 
-    const cr = await sendSmsWithRetry({
-      to: lead.phone,
-      message: confirmMsg,
-      purpose: SMS_PURPOSE.LEAD_CUSTOMER_INTAKE_CONFIRM,
+    const cr = await sendCustomerLeadConfirmation({
       leadId: lead.id,
+      phone: lead.phone,
+      message: confirmMsg,
     });
 
     if (cr.ok && cr.status === "sent") customerStatus = "sent";
@@ -107,31 +107,36 @@ export async function notifyLeadCreatedSms(leadId: number): Promise<{
       lead.area?.trim() ||
       "—";
 
-    const officeNotifyPhone = getOfficeLeadNotifyPhone();
-    if (officeNotifyPhone) {
-      const normOffice = normalizeBdPhone(officeNotifyPhone);
-      if (normOffice.ok) {
-        const animalLabel =
-          formatLeadAnimalDisplay(lead.animalKind, lead.animalType) || "—";
-        const officeMsg = buildLeadIntakeOfficeSms({
+    const animalLabel =
+      formatLeadAnimalDisplay(lead.animalKind, lead.animalType) || "—";
+    const officeMsg = buildLeadIntakeOfficeSms({
+      leadId: lead.id,
+      customerName: lead.customerName,
+      customerPhone: lead.phone,
+      areaLabel,
+      animalLabel,
+      problemPreview: lead.serviceRequirement,
+      trackingUrl,
+    });
+
+    const officePhones = getOfficeLeadNotifyPhones();
+    if (officePhones.length === 0) {
+      officeStatus = "skipped";
+    } else {
+      let anySent = false;
+      let anyFailed = false;
+      for (const rawPhone of officePhones) {
+        const or = await sendOfficeLeadAlert({
           leadId: lead.id,
-          customerName: lead.customerName,
-          customerPhone: lead.phone,
-          areaLabel,
-          animalLabel,
-          problemPreview: lead.serviceRequirement,
-          trackingUrl,
-        });
-        const or = await sendSmsWithRetry({
-          to: normOffice.international880,
+          officePhoneRaw: rawPhone,
           message: officeMsg,
-          purpose: SMS_PURPOSE.LEAD_OFFICE_INTAKE,
-          leadId: lead.id,
         });
-        if (or.ok && or.status === "sent") officeStatus = "sent";
-        else if (!or.ok && or.status === "failed") officeStatus = "failed";
-        else officeStatus = "skipped";
+        if (or.ok && or.status === "sent") anySent = true;
+        if (!or.ok && or.status === "failed") anyFailed = true;
       }
+      if (anySent) officeStatus = "sent";
+      else if (anyFailed) officeStatus = "failed";
+      else officeStatus = "skipped";
     }
 
     if (lead.areaId !== null) {

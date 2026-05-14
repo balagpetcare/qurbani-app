@@ -53,13 +53,32 @@ export function getSmsSenderId(): string {
   ).trim();
 }
 
-/** Office line for new public lead alerts (falls back to legacy admin env). */
-export function getOfficeLeadNotifyPhone(): string {
-  return (
+/** Office lines for new public lead alerts — comma / semicolon / newline separated. */
+export function getOfficeLeadNotifyPhones(): string[] {
+  const raw =
+    process.env.OFFICIAL_LEAD_RECEIVE_PHONES?.trim() ||
     process.env.OFFICIAL_LEAD_RECEIVE_PHONE?.trim() ||
     process.env.ADMIN_SMS_ALERT_PHONE?.trim() ||
-    ""
-  );
+    "";
+  const set = new Set<string>();
+  if (raw) {
+    for (const part of raw.split(/[,;\n]+/)) {
+      const t = part.replace(/\s/g, "").trim();
+      if (t.length >= 10) set.add(t);
+    }
+  }
+  const single = process.env.OFFICIAL_LEAD_RECEIVE_PHONE?.trim();
+  if (single) {
+    const t = single.replace(/\s/g, "");
+    if (t.length >= 10) set.add(t);
+  }
+  return [...set];
+}
+
+/** @deprecated Prefer {@link getOfficeLeadNotifyPhones} — first configured office destination. */
+export function getOfficeLeadNotifyPhone(): string {
+  const all = getOfficeLeadNotifyPhones();
+  return all[0] ?? "";
 }
 
 /** Shown in customer confirmation SMS (e.g. 01711XXXXXX). */

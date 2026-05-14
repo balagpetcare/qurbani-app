@@ -18,6 +18,7 @@ import {
   redactSmsPreview,
 } from "@/lib/server/sms/sms-log.service";
 import type { SendSmsSafeResult, SmsPurpose } from "@/lib/server/sms/sms.types";
+import { logSmsProviderResponse } from "@/lib/sms/logger";
 
 function hasBulkSmsCredentials(): boolean {
   return Boolean(getSmsApiKey() && getSmsSenderId());
@@ -138,6 +139,15 @@ export async function sendSms(input: {
 
   try {
     const r = await postBulkSmsApi(form);
+    if (input.purpose !== "otp") {
+      logSmsProviderResponse({
+        purpose: input.purpose,
+        leadId: input.leadId,
+        httpStatus: r.httpStatus,
+        responseCode: r.code,
+        bodySnippet: r.rawBody,
+      });
+    }
     const providerMsg =
       r.mapped.adminHint === "balance_insufficient"
         ? r.mapped.userMessage

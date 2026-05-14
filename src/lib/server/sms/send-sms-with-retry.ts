@@ -1,6 +1,7 @@
 import { sendSms } from "@/lib/server/sms/sms.service";
 import type { SendSmsSafeResult } from "@/lib/server/sms/sms.types";
 import type { SmsPurpose } from "@/lib/server/sms/sms.types";
+import { logSmsRetry } from "@/lib/sms/logger";
 
 function shouldRetry(result: SendSmsSafeResult): boolean {
   if (result.ok) return false;
@@ -28,6 +29,15 @@ export async function sendSmsWithRetry(input: {
   const max = Math.min(5, Math.max(1, input.maxAttempts ?? 3));
   let last: SendSmsSafeResult | null = null;
   for (let attempt = 1; attempt <= max; attempt++) {
+    if (attempt > 1) {
+      logSmsRetry({
+        purpose: input.purpose,
+        leadId: input.leadId,
+        attempt,
+        maxAttempts: max,
+        reason: "retry_after_failure",
+      });
+    }
     last = await sendSms(input);
     if (!shouldRetry(last)) return last;
     if (attempt < max) {
